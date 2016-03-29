@@ -1,7 +1,9 @@
 
-#include <windows.h>
+//#include <windows.h>
 #include <stdio.h>
 #include <conio.h>
+
+#include "gipcy.h"
 
 char driveName[MAX_PATH] = "\\\\.\\I:";
 char fileName[MAX_PATH] = "data.bin";
@@ -16,18 +18,18 @@ void readIniFile()
 	GetCurrentDirectoryA(sizeof(iniFilePath), iniFilePath);
 	lstrcatA(iniFilePath, "\\disk_speed.ini");
 
-	GetPrivateProfileStringA("Option", "DriveName", "\\\\.\\I:", driveName, sizeof(driveName), iniFilePath);
-	GetPrivateProfileStringA("Option", "DriveFlag", "0", Buffer, sizeof(Buffer), iniFilePath);
+	IPC_getPrivateProfileString("Option", "DriveName", "\\\\.\\I:", driveName, sizeof(driveName), iniFilePath);
+	IPC_getPrivateProfileString("Option", "DriveFlag", "0", Buffer, sizeof(Buffer), iniFilePath);
 	drvFlg = atoi(Buffer);
-	GetPrivateProfileStringA("Option", "FullFileName", "data.bin", fileName, sizeof(fileName), iniFilePath);
-	GetPrivateProfileStringA("Option", "BufferSizeInMb", "1", Buffer, sizeof(Buffer), iniFilePath);
+	IPC_getPrivateProfileString("Option", "FullFileName", "data.bin", fileName, sizeof(fileName), iniFilePath);
+	IPC_getPrivateProfileString("Option", "BufferSizeInMb", "1", Buffer, sizeof(Buffer), iniFilePath);
 	bBufSize = atoi(Buffer) * 1024 * 1024;
-	GetPrivateProfileStringA("Option", "BufferNum", "1", Buffer, sizeof(Buffer), iniFilePath);
+	IPC_getPrivateProfileString("Option", "BufferNum", "1", Buffer, sizeof(Buffer), iniFilePath);
 	bufCnt = atoi(Buffer);
-	GetPrivateProfileStringA("Option", "BufferStatistic", "0", Buffer, sizeof(Buffer), iniFilePath);
+	IPC_getPrivateProfileString("Option", "BufferStatistic", "0", Buffer, sizeof(Buffer), iniFilePath);
 	bufStat = atoi(Buffer);
 }
-
+/*
 void wr_time(double* pTimes)
 {
 	FILE *fs;
@@ -54,102 +56,92 @@ void wr_time(double* pTimes)
 	fclose(fs);
 
 }
-
-
+*/
 
 int main()
 {
 	readIniFile();
 
+	IPC_initKeyboard();
+
 	if(drvFlg)
 	{
 		printf("Data of drive %s will be DESTROYED!!! Continue ?\n", driveName);
-		_getch();
+		IPC_getch();
 	}
 	else
 		printf("File name is %s\n", fileName);
 
 	LARGE_INTEGER Frequency;
-	LARGE_INTEGER StartPerformCount;
-	LARGE_INTEGER StopPerformCount;
-	LARGE_INTEGER StartCount;
-	LARGE_INTEGER StopCount;
+	IPC_TIMEVAL StartPerformCount;
+	IPC_TIMEVAL StopPerformCount;
+	IPC_TIMEVAL StartCount;
+	IPC_TIMEVAL StopCount;
+
 	int bHighRes = QueryPerformanceFrequency (&Frequency);
 
-	void* pBuffer = VirtualAlloc(NULL, bBufSize, MEM_COMMIT, PAGE_READWRITE);
+	void* pBuffer = IPC_virtAlloc(bBufSize);
 	if(!pBuffer)
 	{
 		printf("VirtualAlloc() is error!!!\n");
-		_getch();
+		IPC_getch();
 		return -1; // error
 	}
 	double* pTimes = NULL;
 	if(bufStat)
 		pTimes = new double[bufCnt];
 
-	HANDLE hfile;
+	IPC_handle hfile = 0;
+
 	if(drvFlg)
 	{
-		hfile = CreateFileA(	driveName,
-								GENERIC_WRITE,
-//								FILE_SHARE_WRITE | FILE_SHARE_READ,
-								0,
-								NULL,
-								OPEN_EXISTING,
-								0,
-								NULL);
+		hfile = IPC_openFileEx(driveName, IPC_OPEN_FILE | IPC_FILE_WRONLY, 0);
 	}
 	else
 	{
-		hfile = CreateFileA(	fileName,
-								GENERIC_WRITE,
-//								FILE_SHARE_WRITE | FILE_SHARE_READ,
-								0,
-								NULL,
-								CREATE_ALWAYS,
-//								FILE_ATTRIBUTE_NORMAL,
-							    FILE_FLAG_NO_BUFFERING,         
-								NULL);
+		//hfile = IPC_openFile(fileName, IPC_CREATE_FILE | IPC_FILE_WRONLY, FILE_ATTRIBUTE_NORMAL);
+		hfile = IPC_openFileEx(fileName, IPC_CREATE_FILE | IPC_FILE_WRONLY, IPC_FILE_NOBUFFER);
 	}
 	if(hfile == INVALID_HANDLE_VALUE)
 	{
 		printf("CreateFile() is error!!!\n");
-		_getch();
+		IPC_getch();
 		return -1;
 	}
-	ULONG nNumberOfWriteBytes;
+	//ULONG nNumberOfWriteBytes;
 	double ms_time;
 	double max_time = 0.;
 
-	QueryPerformanceCounter(&StartPerformCount);
+	IPC_getTime(&StartPerformCount);
 
 	for(int i = 0; i < bufCnt; i++)
 	{
-		QueryPerformanceCounter(&StartCount);
-		WriteFile(hfile, pBuffer, bBufSize, &nNumberOfWriteBytes, NULL);
-		QueryPerformanceCounter(&StopCount);
-		ms_time = (double)(StopCount.QuadPart - StartCount.QuadPart) / (double)Frequency.QuadPart * 1.E3;
+		IPC_getTime(&StartCount);
+		IPC_writeFile(hfile, pBuffer, bBufSize);
+		IPC_getTime(&StopCount);
+		ms_time = IPC_getDiffTime(&StartCount, &StopCount);
 		if(bufStat)
 			pTimes[i] = ms_time;
 		if(ms_time > max_time)
 			max_time = ms_time;
 		printf("Buffer number is %d\r", i);
 	}
-	QueryPerformanceCounter (&StopPerformCount);
-	double msTime = (double)(StopPerformCount.QuadPart - StartPerformCount.QuadPart) / (double)Frequency.QuadPart * 1.E3;
+	IPC_getTime(&StopPerformCount);
+	double msTime = IPC_getDiffTime(&StartPerformCount, &StopPerformCount);
 	printf("Hard drive write speed is %f Mbytes/sec\n", ((double)bBufSize * bufCnt / msTime)/1000.);
 
 	printf("Min write speed is %f Mbytes/sec\n", ((double)bBufSize / max_time)/1000.);
 
-	CloseHandle(hfile);
+	IPC_closeFile(hfile);
 
 	if(bufStat)
 	{
-		wr_time(pTimes);
+		//wr_time(pTimes);
 		delete[] pTimes;
 	}
-	VirtualFree(pBuffer, 0, MEM_RELEASE);
+	IPC_virtFree(pBuffer);
 
-	_getch();
+	IPC_getch();
+	IPC_cleanupKeyboard();
 	return 0;
 }
