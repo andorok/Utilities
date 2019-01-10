@@ -108,7 +108,8 @@ thread_value __IPC_API FileWritingThread(void* pParams)
 		//	pTimes[i] = ms_time;
 		if (ms_time > max_time)
 			max_time = ms_time;
-		printf("Buffer number is %d\r", i);
+		printf("Device %d: Buffer number is %d\r", idx, i);
+		//printf("Buffer number is %d\r", i);
 	}
 
 	return (thread_value)status;
@@ -231,9 +232,10 @@ int main()
 	IPC_getTime(&StopPerformCount);
 
 	double msTime = IPC_getDiffTime(&StartPerformCount, &StopPerformCount);
-	printf("Hard drive write speed is %f Mbytes/sec\n", ((double)bBufSize * bufCnt / msTime)/1000.);
+	printf("Hard drive(s) write speed is %f(%f) Mbytes/sec\n", ((double)bBufSize * bufCnt / msTime) / 1000.,
+									((double)bBufSize * bufCnt * driveCnt / msTime)/1000.);
 
-	printf("Min write speed is %f Mbytes/sec\n", ((double)bBufSize / max_time)/1000.);
+	printf("Min write (one buffer) speed is %f Mbytes/sec\n", ((double)bBufSize / max_time)/1000.);
 
 	for (int i = 0; i < driveCnt; i++)
 	{
