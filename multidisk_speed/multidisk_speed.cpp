@@ -12,6 +12,15 @@ ULONG bBufSize;
 int bufCnt, bufStat;
 int drvFlg = 0;
 
+typedef struct _TIME_STAT {
+	volatile int dev;
+	volatile double	wrtime;
+} TIME_STAT, *PTIME_STAT;
+
+
+volatile TIME_STAT* pTimes = NULL;
+volatile int iTimes = 0;
+HANDLE hMutex;
 int driveCnt = 1;
 
 void readIniFile()
@@ -76,12 +85,12 @@ void wr_time(double* pTimes)
 */
 
 typedef struct _THREAD_PARAM {
-	IPC_handle file_handle;
+	HANDLE file_handle;
 	void*	pBufData;
 	int idx;
 } THREAD_PARAM, *PTHREAD_PARAM;
 
-double max_time = 0.;
+volatile TIME_STAT max_time;
 
 thread_value __IPC_API FileWritingThread(void* pParams)
 {
@@ -89,25 +98,47 @@ thread_value __IPC_API FileWritingThread(void* pParams)
 	IPC_TIMEVAL StartCount;
 	IPC_TIMEVAL StopCount;
 	double ms_time;
-	//SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
 	//int prior = GetThreadPriority(GetCurrentThread());
 	//BRDC_printf(_BRDC("Thread Priority = %d\n"), prior);
 
 	PTHREAD_PARAM pThreadParam = (PTHREAD_PARAM)pParams;
-	IPC_handle hfile = pThreadParam->file_handle;
+	HANDLE hfile = pThreadParam->file_handle;
 	int idx = pThreadParam->idx;
 	void* pBuffer = pThreadParam->pBufData;
+
+	SetThreadIdealProcessor(GetCurrentThread(), idx + 2);
+
+	unsigned long writesize;
+	OVERLAPPED ovl;
+	ovl.hEvent = NULL;
+	ovl.Offset = 0;
+	ovl.OffsetHigh = 0;
+	unsigned __int64 fullOffset = 0;
 
 	for (int i = 0; i < bufCnt; i++)
 	{
 		IPC_getTime(&StartCount);
-		int status = IPC_writeFile(hfile, pBuffer, bBufSize);
+		//status = IPC_writeFile(hfile, pBuffer, bBufSize);
+		status = WriteFile(hfile, pBuffer, bBufSize, &writesize, &ovl);
+		WaitForSingleObject(hfile, INFINITE);
 		IPC_getTime(&StopCount);
+		fullOffset += bBufSize;
+		ovl.Offset = fullOffset & 0xFFFFFFFF;
+		ovl.OffsetHigh = (fullOffset >> 32) & 0xFFFFFFFF;
 		ms_time = IPC_getDiffTime(&StartCount, &StopCount);
+		WaitForSingleObject(hMutex, INFINITE);
 		//if (bufStat)
-		//	pTimes[i] = ms_time;
-		if (ms_time > max_time)
-			max_time = ms_time;
+		//{
+		//	pTimes[iTimes].dev = idx;
+		//	pTimes[iTimes++].wrtime = ms_time;
+		//}
+		if (ms_time > max_time.wrtime)
+		{
+			max_time.wrtime = ms_time;
+			//max_time.dev = i;
+		}
+		ReleaseMutex(hMutex);
 		printf("Device %d: Buffer number is %d\r", idx, i);
 		//printf("Buffer number is %d\r", i);
 	}
@@ -157,17 +188,17 @@ int main()
 		}
 	}
 
-	double* pTimes = NULL;
 	if(bufStat)
-		pTimes = new double[bufCnt];
+		pTimes = new TIME_STAT[bufCnt * driveCnt];
 
-	IPC_handle hfile[4];
+	HANDLE hfile[4];
 
 	if(drvFlg)
 	{
 		for (int i = 0; i < driveCnt; i++)
 		{
-			hfile[i] = IPC_openFileEx(driveName[i], IPC_OPEN_FILE | IPC_FILE_WRONLY, 0);
+			//hfile[i] = IPC_openFileEx(driveName[i], IPC_OPEN_FILE | IPC_FILE_WRONLY, 0);
+			hfile[i] = CreateFile(driveName[i], GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
 		}
 	}
 	else
@@ -175,7 +206,8 @@ int main()
 		for (int i = 0; i < driveCnt; i++)
 		{
 			//hfile = IPC_openFile(fileName, IPC_CREATE_FILE | IPC_FILE_WRONLY, FILE_ATTRIBUTE_NORMAL);
-			hfile[i] = IPC_openFileEx(fileName[i], IPC_CREATE_FILE | IPC_FILE_WRONLY, IPC_FILE_NOBUFFER);
+			//hfile[i] = IPC_openFileEx(fileName[i], IPC_CREATE_FILE | IPC_FILE_WRONLY, IPC_FILE_NOBUFFER);
+			hfile[i] = CreateFile(fileName[i], GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_FLAG_NO_BUFFERING | FILE_FLAG_OVERLAPPED, NULL);
 		}
 	}
 	for (int i = 0; i < driveCnt; i++)
@@ -185,6 +217,10 @@ int main()
 			IPC_getch();
 			return -1;
 		}
+
+	max_time.dev = -1;
+	max_time.wrtime = 0.;
+	hMutex = CreateMutex(NULL, FALSE, NULL);
 
 	//ULONG nNumberOfWriteBytes;
 	
@@ -235,13 +271,15 @@ int main()
 	printf("Hard drive(s) write speed is %f(%f) Mbytes/sec\n", ((double)bBufSize * bufCnt / msTime) / 1000.,
 									((double)bBufSize * bufCnt * driveCnt / msTime)/1000.);
 
-	printf("Min write (one buffer) speed is %f Mbytes/sec\n", ((double)bBufSize / max_time)/1000.);
+	printf("Min write (one buffer) speed is %f Mbytes/sec\n", ((double)bBufSize / max_time.wrtime)/1000.);
 
 	for (int i = 0; i < driveCnt; i++)
 	{
-		IPC_closeFile(hfile[i]);
+		CloseHandle(hfile[i]);
 		IPC_virtFree(pBuffer[i]);
 	}
+
+	CloseHandle(hMutex);
 
 	if (bufStat)
 	{
