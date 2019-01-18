@@ -17,8 +17,7 @@ typedef struct _TIME_STAT {
 	volatile double	wrtime;
 } TIME_STAT, *PTIME_STAT;
 
-
-volatile TIME_STAT* pTimes = NULL;
+TIME_STAT* pTimes = NULL;
 volatile int iTimes = 0;
 HANDLE hMutex;
 int driveCnt = 1;
@@ -55,8 +54,8 @@ void readIniFile()
 	IPC_getPrivateProfileString("Option", "BufferStatistic", "0", Buffer, sizeof(Buffer), iniFilePath);
 	bufStat = atoi(Buffer);
 }
-/*
-void wr_time(double* pTimes)
+
+void wr_time(TIME_STAT* pTimes)
 {
 	FILE *fs;
 	//errno_t err = _wfopen_s(&fs, L"Statistic.txt", L"w+t");
@@ -72,17 +71,18 @@ void wr_time(double* pTimes)
 
 	errno_t err = _wfopen_s(&fs, L"Statistic.txt", L"w+b");
 
-	for(int i = 0; i < bufCnt; i++)
+	int bufCntTotal = bufCnt * driveCnt;
+	for(int i = 0; i < bufCntTotal; i++)
 	{
-		int val = (int)((double)bBufSize / pTimes[i])/1000.;
-		fprintf(fs, "%d\n", val);
+		int val = (int)((double)bBufSize / pTimes[i].wrtime)/1000.;
+		fprintf(fs, "%d %d %d\n", pTimes[i].dev & 0xF, pTimes[i].dev >> 4, val);
 
 		//_write(fs,&val,8);
 	}
 	fclose(fs);
 
+	printf("File Statistic.txt is written\n");
 }
-*/
 
 typedef struct _THREAD_PARAM {
 	HANDLE file_handle;
@@ -116,7 +116,7 @@ thread_value __IPC_API FileWritingThread(void* pParams)
 	ovl.OffsetHigh = 0;
 	unsigned __int64 fullOffset = 0;
 
-	for (int i = 0; i < bufCnt; i++)
+	for (int iBuf = 0; iBuf < bufCnt; iBuf++)
 	{
 		IPC_getTime(&StartCount);
 		//status = IPC_writeFile(hfile, pBuffer, bBufSize);
@@ -128,18 +128,18 @@ thread_value __IPC_API FileWritingThread(void* pParams)
 		ovl.OffsetHigh = (fullOffset >> 32) & 0xFFFFFFFF;
 		ms_time = IPC_getDiffTime(&StartCount, &StopCount);
 		WaitForSingleObject(hMutex, INFINITE);
-		//if (bufStat)
-		//{
-		//	pTimes[iTimes].dev = idx;
-		//	pTimes[iTimes++].wrtime = ms_time;
-		//}
+		if (bufStat)
+		{
+			pTimes[iTimes].dev = (iBuf << 4) + idx;
+			pTimes[iTimes++].wrtime = ms_time;
+		}
 		if (ms_time > max_time.wrtime)
 		{
 			max_time.wrtime = ms_time;
-			//max_time.dev = i;
+			max_time.dev = (iBuf << 4) + idx;
 		}
 		ReleaseMutex(hMutex);
-		printf("Device %d: Buffer number is %d\r", idx, i);
+		printf("Device %d: Buffer number is %d\r", idx, iBuf);
 		//printf("Buffer number is %d\r", i);
 	}
 
@@ -167,6 +167,8 @@ int main()
 			printf("File name is %s\n", fileName[i]);
 		}
 	}
+
+	printf("Buffer size is %d Mbytes, buffer count is %d\n", bBufSize / 1024 / 1024, bufCnt);
 
 	LARGE_INTEGER Frequency;
 	IPC_TIMEVAL StartPerformCount;
@@ -204,7 +206,7 @@ int main()
 	else
 	{
 		for (int i = 0; i < driveCnt; i++)
-		{
+	{
 			//hfile = IPC_openFile(fileName, IPC_CREATE_FILE | IPC_FILE_WRONLY, FILE_ATTRIBUTE_NORMAL);
 			//hfile[i] = IPC_openFileEx(fileName[i], IPC_CREATE_FILE | IPC_FILE_WRONLY, IPC_FILE_NOBUFFER);
 			hfile[i] = CreateFile(fileName[i], GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_FLAG_NO_BUFFERING | FILE_FLAG_OVERLAPPED, NULL);
@@ -271,7 +273,7 @@ int main()
 	printf("Hard drive(s) write speed is %f(%f) Mbytes/sec\n", ((double)bBufSize * bufCnt / msTime) / 1000.,
 									((double)bBufSize * bufCnt * driveCnt / msTime)/1000.);
 
-	printf("Min write (one buffer) speed is %f Mbytes/sec\n", ((double)bBufSize / max_time.wrtime)/1000.);
+	printf("Min write (%d device, %d buffer) speed is %f Mbytes/sec\n", max_time.dev & 0xF, max_time.dev >> 4, ((double)bBufSize / max_time.wrtime)/1000.);
 
 	for (int i = 0; i < driveCnt; i++)
 	{
@@ -283,7 +285,7 @@ int main()
 
 	if (bufStat)
 	{
-		//wr_time(pTimes);
+		wr_time(pTimes);
 		delete[] pTimes;
 	}
 
