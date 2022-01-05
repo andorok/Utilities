@@ -215,7 +215,7 @@ int main()
 	for (int i = 0; i < driveCnt; i++)
 		if (hfile[i] == INVALID_HANDLE_VALUE)
 		{
-			printf("CreateFile() is error!!!\n");
+			printf("CreateFile(%d) is error!!!\n", i);
 			IPC_getch();
 			return -1;
 		}

@@ -18,7 +18,7 @@ void readIniFile()
 	GetCurrentDirectoryA(sizeof(iniFilePath), iniFilePath);
 	lstrcatA(iniFilePath, "\\disk_speed.ini");
 
-	IPC_getPrivateProfileString("Option", "DriveName", "\\\\.\\I:", driveName, sizeof(driveName), iniFilePath);
+	IPC_getPrivateProfileString("Option", "DriveName", "\\\\.\\H:", driveName, sizeof(driveName), iniFilePath);
 	IPC_getPrivateProfileString("Option", "DriveFlag", "0", Buffer, sizeof(Buffer), iniFilePath);
 	drvFlg = atoi(Buffer);
 	IPC_getPrivateProfileString("Option", "FullFileName", "data.bin", fileName, sizeof(fileName), iniFilePath);
