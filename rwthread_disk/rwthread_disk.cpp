@@ -565,6 +565,12 @@ void*	file_write_thread(void* pParams)
 unsigned int __stdcall file_write_thread(void* pParams)
 #endif
 {
+#ifdef _WIN32
+	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+	//SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
+	int prior = GetThreadPriority(GetCurrentThread());
+	printf("Thread Priority = %d\n", prior);
+#endif
 	PTHREAD_PARAM pThreadParam = (PTHREAD_PARAM)pParams;
 	
 	int bsize = pThreadParam->size;
