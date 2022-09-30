@@ -1,5 +1,5 @@
 
-#include <stdio.h>
+//#include <stdio.h>
 
 //#include <numa.h>
 //#include <sched.h>
@@ -20,17 +20,13 @@
 #endif
 
 #include "time_func.h"
+#include "mem_func.h"
+#include "cthread.h"
 
 #define SIZE_1G 1024*1024*1024
 #define SIZE_32M 32*1024*1024
 #define SIZE_16M 16*1024*1024
 #define SIZE_1M 1024*1024
-
-//struct find_t {
-//	double val;
-//	float re;
-//	float im;
-//};
 
 #include <csignal>
 #include <cstring>
@@ -38,7 +34,7 @@
 
 #ifdef __linux__
 #define MAX_PATH          260
-char drive_name[MAX_PATH] = "/dev/sdc1";
+//char drive_name[MAX_PATH] = "/dev/sdc1";
 char file_name[MAX_PATH] = "/mnt/diskG/data";
 //char file_name[MAX_PATH] = "/mnt/f/32G/data";
 //char file_name[MAX_PATH] = "/mnt/e/data";
@@ -47,18 +43,14 @@ pthread_mutex_t mutex_read;
 pthread_mutex_t mutex_write;
 
 #else
-char drive_name[MAX_PATH] = "\\\\.\\G:";
+//char drive_name[MAX_PATH] = "\\\\.\\G:";
 //char file_name[MAX_PATH] = "G:/data";
 char file_name[MAX_PATH] = "F:/32G/data";
-//char file_name[MAX_PATH] = "F:/data";
 
 char name_mutex_read[MAX_PATH] = "mutex_read_file";
 char name_mutex_write[MAX_PATH] = "mutex_write_file";
 HANDLE g_hMutex_read = NULL;
 HANDLE g_hMutex_write = NULL;
-
-//HANDLE g_hEvent_read = NULL;
-//HANDLE g_hEvent_write = NULL;
 
 #endif // __linux__
 
@@ -71,7 +63,7 @@ int g_drive = 0;
 static bool exit_app = false;
 void signal_handler(int signo)
 {
-	fprintf(stderr, "\n\n");
+	fprintf(stderr, "\nSignal CTRL+C\n");
 	signo = signo;
 	exit_app = true;
 }
@@ -84,7 +76,7 @@ void DisplayHelp()
 	printf("disk_test.exe [<swtches>]\n");
 	printf("Switches:\n");
 	printf(" -dir  - direct and sync writing\n");
-	printf(" -drv  - writing to drive without file system\n");
+	//printf(" -drv  - writing to drive without file system\n");
 	//	printf(" -thr<N>  - use N threads\n");
 	printf(" -n<N>  - writing N files\n");
 	printf("\n");
@@ -113,11 +105,11 @@ void ParseCommandLine(int argc, char *argv[])
 		}
 
 		// Указать режим записи на диск без файловой системы
-		if (!strcmp(argv[ii], "-drv"))
-		{
-			g_drive = 1;
-			printf("Command line: -drv\n");
-		}
+		//if (!strcmp(argv[ii], "-drv"))
+		//{
+		//	g_drive = 1;
+		//	printf("Command line: -drv\n");
+		//}
 
 		// Выполнить чтение и проверку после записи
 		//if (!strcmp(argv[ii], "-rd"))
@@ -149,45 +141,45 @@ void ParseCommandLine(int argc, char *argv[])
 	}
 }
 
-#ifdef __linux__
-
-//! Функция выделяет страницы виртуальной памяти процесса
-void* virtAlloc(size_t nSize)
-{
-	void *ptr = NULL;
-	long pageSize = sysconf(_SC_PAGESIZE);
-	int  res = posix_memalign(&ptr, pageSize, nSize);
-
-	if ((res != 0) || !ptr)
-		return NULL;
-
-	return ptr;
-}
-
-//! Функция освобождает страницы виртуальной памяти процесса
-void virtFree(void *ptr)
-{
-	free(ptr);
-}
-
-#else
-
-//! Функция выделяет страницы виртуальной памяти процесса
-void* virtAlloc(size_t nSize)
-{
-	void* ptr = VirtualAlloc(NULL, nSize, MEM_COMMIT, PAGE_READWRITE);
-
-	return ptr;
-}
-
-//! Функция освобождает страницы виртуальной памяти процесса
-void virtFree(void *ptr)
-{
-	VirtualFree(ptr, 0, MEM_RELEASE);
-
-}
-
-#endif
+//#ifdef __linux__
+//
+////! Функция выделяет страницы виртуальной памяти процесса
+//void* virtAlloc(size_t nSize)
+//{
+//	void *ptr = NULL;
+//	long pageSize = sysconf(_SC_PAGESIZE);
+//	int  res = posix_memalign(&ptr, pageSize, nSize);
+//
+//	if ((res != 0) || !ptr)
+//		return NULL;
+//
+//	return ptr;
+//}
+//
+////! Функция освобождает страницы виртуальной памяти процесса
+//void virtFree(void *ptr)
+//{
+//	free(ptr);
+//}
+//
+//#else
+//
+////! Функция выделяет страницы виртуальной памяти процесса
+//void* virtAlloc(size_t nSize)
+//{
+//	void* ptr = VirtualAlloc(NULL, nSize, MEM_COMMIT, PAGE_READWRITE);
+//
+//	return ptr;
+//}
+//
+////! Функция освобождает страницы виртуальной памяти процесса
+//void virtFree(void *ptr)
+//{
+//	VirtualFree(ptr, 0, MEM_RELEASE);
+//
+//}
+//
+//#endif
 
 int file_write_direct(void *buf, char* fname)
 {
@@ -550,6 +542,8 @@ int read_drive(char* fname, int num, uint32_t *read_buf, uint32_t *cmp_buf)
 volatile int wrfile_num = -1;
 volatile int rdfile_num = -1;
 
+volatile int g_read_max = 1;
+
 typedef struct {
 	uint32_t *wr_buf;
 	uint32_t size;
@@ -609,17 +603,15 @@ unsigned int __stdcall file_write_thread(void* pParams)
 					//printf("THREAD: Waiting read mutex before writing (wr_num %d, rd_num %d, wr_idx %d)...                   \n", wrfile_num, rdfile_num, idx);
 					WaitForSingleObject(g_hMutex_read, INFINITE);
 					ReleaseMutex(g_hMutex_read);
-					//WaitForSingleObject(g_hEvent_read, INFINITE);
 #endif
 				}
 
 #ifdef __linux__
 				pthread_mutex_lock(&mutex_write);
 #else
-				//printf("THREAD: CApturing write mutex (wr_num %d, rd_num %d, wr_idx %d)...                   \n", wrfile_num, rdfile_num, idx);
+				//printf("THREAD: Capturing write mutex (wr_num %d, rd_num %d, wr_idx %d)...                   \n", wrfile_num, rdfile_num, idx);
 				printf("WRITE CAPTURE (wr_idx %d)!\n", idx);
 				WaitForSingleObject(g_hMutex_write, INFINITE);
-				//SetEvent(g_hEvent_write);
 #endif
 
 				wrfile_num = idx;
@@ -639,7 +631,6 @@ unsigned int __stdcall file_write_thread(void* pParams)
 						return (void*)-1;
 #else
 						ReleaseMutex(g_hMutex_write);
-						//ResetEvent(g_hEvent_write);
 						return ret;
 #endif
 					}
@@ -655,7 +646,6 @@ unsigned int __stdcall file_write_thread(void* pParams)
 						return (void*)-1;
 #else
 						ReleaseMutex(g_hMutex_write);
-						//ResetEvent(g_hEvent_write);
 						return -1;
 #endif
 					}
@@ -670,7 +660,6 @@ unsigned int __stdcall file_write_thread(void* pParams)
 						return (void*)-1;
 #else
 						ReleaseMutex(g_hMutex_write);
-						//ResetEvent(g_hEvent_write);
 						return -1;
 #endif
 					}
@@ -687,7 +676,6 @@ unsigned int __stdcall file_write_thread(void* pParams)
 				//printf("THREAD: Release write mutex (wr_num %d, rd_num %d, wr_idx %d)...                   \n", wrfile_num, rdfile_num, idx);
 				printf("WRITE RELEASE (wr_idx %d)!\n", idx);
 				ReleaseMutex(g_hMutex_write);
-				//ResetEvent(g_hEvent_write);
 #endif
 
 				total_time += wr_time;
@@ -700,6 +688,7 @@ unsigned int __stdcall file_write_thread(void* pParams)
 							wrfname, ((double)writesize * (++count) / total_time) / 1000., ((double)writesize / wr_time) / 1000., ((double)writesize / max_time) / 1000.);
 
 			//	printf("\n");
+				g_read_max = (count < g_fcnt) ? count : g_fcnt;
 
 				if (exit_app)
 					break;
@@ -775,13 +764,11 @@ int main(int argc, char *argv[])
 #ifdef __linux__
 	pthread_mutex_init(&mutex_read, NULL);//Инициализация мьютекса
 	pthread_mutex_init(&mutex_write, NULL);//Инициализация мьютекса
-	pthread_t thread_id;
+	//pthread_t thread_id;
 #else
 	g_hMutex_read = CreateMutex(NULL, FALSE, name_mutex_read);
 	g_hMutex_write = CreateMutex(NULL, FALSE, name_mutex_write);
-	//g_hEvent_read = CreateEvent(NULL, TRUE, FALSE, NULL); // начальное состояние NonSignaled
-	//g_hEvent_write = CreateEvent(NULL, TRUE, FALSE, NULL); // начальное состояние NonSignaled
-	HANDLE hThread;
+	//HANDLE hThread;
 #endif
 
 	THREAD_PARAM thread_par;
@@ -789,12 +776,14 @@ int main(int argc, char *argv[])
 	thread_par.size = bsize;
 	//thread_par.size = SIZE_1G / sizeof(int32_t);
 
-#ifdef __linux__
-	thread_id = createThread(&file_write_thread, &(thread_par));
-#else
-	unsigned threadID;
-	hThread = (HANDLE)_beginthreadex(NULL, 0, &file_write_thread, &(thread_par), 0, &(threadID));
-#endif
+	CThread write_thread;
+	write_thread.createThread(&file_write_thread, &(thread_par));
+//#ifdef __linux__
+//	thread_id = createThread(&file_write_thread, &(thread_par));
+//#else
+//	unsigned threadID;
+//	hThread = (HANDLE)_beginthreadex(NULL, 0, &file_write_thread, &(thread_par), 0, &(threadID));
+//#endif
 
 	while (!exit_app)
 	{
@@ -802,13 +791,21 @@ int main(int argc, char *argv[])
 			break;
 
 		int idx = 2;
-		printf("ENTER the file number for reading !\n");
+		printf("ENTER the file number (0 - %d) for reading !\n", g_read_max-1);
+		//printf("ENTER the file number for reading !\n");
+		// выход из scanf по CTRL+D под Windows и по CTRL+Z под Linux 
 		int inpch_cnt = scanf("%d", &idx);
-		if(!inpch_cnt)
-			break;
-
+		if (inpch_cnt != 1)
+		{
+			printf("scanf returned NOT 1 !\n");
+			exit_app = 1;
+		// break;
+		}
 		if (exit_app)
 			break;
+
+		if (idx >= g_read_max)
+			continue;
 
 		{
 			sprintf(rdfname, "%s_%03d", file_name, idx);
@@ -825,7 +822,6 @@ int main(int argc, char *argv[])
 				WaitForSingleObject(g_hMutex_write, INFINITE);
 				//printf("MAIN: Release read mutex (wr_num %d, rd_num %d, rd_idx %d)...                   \n", wrfile_num, rdfile_num, idx);
 				ReleaseMutex(g_hMutex_write);
-				//WaitForSingleObject(g_hEvent_write, INFINITE);
 #endif
 			}
 
@@ -835,7 +831,6 @@ int main(int argc, char *argv[])
 			//printf("MAIN: Capturing read mutex (wr_num %d, rd_num %d, rd_idx %d)...                   \n", wrfile_num, rdfile_num, idx);
 			printf("READ CAPTURE (rd_idx %d)!\n", idx);
 			WaitForSingleObject(g_hMutex_read, INFINITE);
-			//SetEvent(g_hEvent_read);
 #endif
 
 			rdfile_num = idx;
@@ -853,7 +848,6 @@ int main(int argc, char *argv[])
 					pthread_mutex_unlock(&mutex_read);
 #else
 					ReleaseMutex(g_hMutex_read);
-					//ResetEvent(g_hEvent_read);
 #endif
 					return ret;
 				}
@@ -868,7 +862,6 @@ int main(int argc, char *argv[])
 					pthread_mutex_unlock(&mutex_read);
 #else
 					ReleaseMutex(g_hMutex_read);
-					//ResetEvent(g_hEvent_read);
 #endif
 					return -1;
 				}
@@ -882,7 +875,6 @@ int main(int argc, char *argv[])
 					pthread_mutex_unlock(&mutex_read);
 #else
 					ReleaseMutex(g_hMutex_read);
-					//ResetEvent(g_hEvent_read);
 #endif
 					return -1;
 				}
@@ -900,7 +892,6 @@ int main(int argc, char *argv[])
 			//printf("MAIN: Release read mutex (wr_num %d, rd_num %d, rd_idx %d)...                   \n", wrfile_num, rdfile_num, idx);
 			printf("READ RELEASE (rd_idx %d)!\n", idx);
 			ReleaseMutex(g_hMutex_read);
-			//ResetEvent(g_hEvent_read);
 #endif
 
 			//printf("READ THREAD: Time (%s): Total %.4f s, Cur %.4f s, Max %.4f s\n",
@@ -927,26 +918,23 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	write_thread.waitThread(INFINITE);
+	write_thread.deleteThread();
 #ifdef __linux__
-	waitThread(thread_id, -1);// Wait until threads terminates
+	//waitThread(thread_id, -1);// Wait until threads terminates
 	//deleteThread(thread_id);
 	pthread_mutex_destroy(&mutex_read); //Уничтожение мьютекса
 	pthread_mutex_destroy(&mutex_write); //Уничтожение мьютекса
 #else
-	WaitForSingleObject(hThread, INFINITE); // Wait until threads terminates
-	CloseHandle(hThread);
+	//WaitForSingleObject(hThread, INFINITE); // Wait until threads terminates
+	//CloseHandle(hThread);
 
 	CloseHandle(g_hMutex_read);
 	CloseHandle(g_hMutex_write);
-	//CloseHandle(g_hEvent_read);
-	//CloseHandle(g_hEvent_write);
 #endif
 
 	virtFree(rdBuf);
 	virtFree(wrBuf);
-
-	//pa.free_mem(rdpage);
-	//pa.free_mem(wrpage);
 
 	return 0;
 }

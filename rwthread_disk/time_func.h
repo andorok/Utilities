@@ -1,6 +1,6 @@
 
-#ifndef TIMEIPC_H
-#define TIMEIPC_H
+#ifndef _TIME_FUNC_H
+#define _TIME_FUNC_H
 
 #include <thread>
 #include <chrono>
@@ -28,4 +28,4 @@ inline void ipc_delay(int ms)
 	std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
-#endif //TIMEIPC_H
+#endif // _TIME_FUNC_H

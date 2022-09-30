@@ -1,24 +1,21 @@
 
-
 #ifdef __linux__
-
-//#include "linipc.h"
 
 #include <pthread.h>
 //#include <unistd.h>
 //#include <ctype.h>
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
+//#include <stdlib.h>
+//#include <stdint.h>
 #include <string.h>
 #include <errno.h>
-#include <error.h>
-#include <ctype.h>
-#include <time.h>
-#include <signal.h>
-#include <fcntl.h>
-#include <limits.h>
+//#include <error.h>
+//#include <ctype.h>
+//#include <time.h>
+//#include <signal.h>
+//#include <fcntl.h>
+//#include <limits.h>
 
 //-----------------------------------------------------------------------------
 pthread_t createThread(void* (*function)(void *), void* param)
@@ -26,17 +23,17 @@ pthread_t createThread(void* (*function)(void *), void* param)
 {
 	int res;
 	pthread_t thread_id;        // ID returned by pthread_create()
-	pthread_attr_t attr;
-	// Initialize thread creation attributes
-	res = pthread_attr_init(&attr);
 
-	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+	//pthread_attr_t attr; // поток можно создать с заданием ему некоторых атрибутов
+	//res = pthread_attr_init(&attr); // Инициализация атрибутов по-умолчанию
+	//pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE); // 
     //pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    //res = pthread_create(&thread_id, &attr, function, param);
 
-    res = pthread_create(&thread_id, &attr, function, param);
+	res = pthread_create(&thread_id, NULL, function, param);
 
 	//Destroy the thread attributes object, since it is no longer needed
-    pthread_attr_destroy(&attr);
+    //pthread_attr_destroy(&attr);
 
     if(res != 0) {
         printf("%s(): error create thread. %s\n", __FUNCTION__, strerror(errno));
@@ -58,18 +55,14 @@ int waitThread(pthread_t thread_id, int timeout)
 	{
 		//printf("%s(): Start waiting...\n", __FUNCTION__);
         res = pthread_join(thread_id, &retval);
-
     }
 	else
 	{
         struct timespec ts;
-
         if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-
 			//printf("%s(): pthread_join() error int clock_gettime(). Try again.\n", __FUNCTION__);
             return -EAGAIN;
         }
-
         ts.tv_nsec += (timeout*1000000);
         res = pthread_timedjoin_np(thread_id, NULL, &ts);
     }

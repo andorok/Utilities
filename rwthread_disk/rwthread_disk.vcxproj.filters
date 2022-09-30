@@ -4,7 +4,7 @@
     <ClCompile Include="rwthread_disk.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="threads.cpp">
+    <ClCompile Include="cthread.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
   </ItemGroup>
@@ -20,7 +20,13 @@
     <None Include="Makefile" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\time_func.h">
+    <ClInclude Include="time_func.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="mem_func.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="cthread.h">
       <Filter>Headers</Filter>
     </ClInclude>
   </ItemGroup>
