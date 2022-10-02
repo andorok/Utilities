@@ -7,6 +7,9 @@
     <ClCompile Include="cthread.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
+    <ClCompile Include="rwdisk.cpp">
+      <Filter>Sources</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Sources">

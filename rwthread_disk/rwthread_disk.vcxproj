@@ -168,6 +168,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="cthread.cpp" />
+    <ClCompile Include="rwdisk.cpp" />
     <ClCompile Include="rwthread_disk.cpp" />
   </ItemGroup>
   <ItemGroup>
