@@ -36,16 +36,18 @@
 #ifdef __linux__
 
 #define MAX_PATH          260
-//char drive_name[MAX_PATH] = "/dev/sdc1";
+char drive_name[MAX_PATH] = "/dev/sdc1";
 char file_name[MAX_PATH] = "/mnt/diskG/data";
 //char file_name[MAX_PATH] = "/mnt/f/32G/data";
 //char file_name[MAX_PATH] = "/mnt/e/data";
 
 #else
 
-//char drive_name[MAX_PATH] = "\\\\.\\G:";
-//char file_name[MAX_PATH] = "G:/data";
-char file_name[MAX_PATH] = "F:/32G/data";
+char drive_name[MAX_PATH] = "\\\\.\\G:";
+//char drive_name[MAX_PATH] = "G:\\";
+//char drive_name[MAX_PATH] = "\\\\.\\PhysicalDrive3";
+char file_name[MAX_PATH] = "G:/data";
+//char file_name[MAX_PATH] = "F:/32G/data";
 
 #endif // __linux__
 
@@ -142,11 +144,12 @@ int file_read_direct(char* fname, void *buf, size_t size);
 int file_read(char* fname, void *buf, size_t size);
 //int write2drive(void *buf, char* fname, int num);
 //int read_drive(char* fname, int num, uint32_t *read_buf, uint32_t *cmp_buf);
+int get_info_drive(char* drvname);
 
 volatile int wrfile_num = -1;
 volatile int rdfile_num = -1;
 
-volatile int g_read_max = 1;
+//volatile int g_read_max = 1;
 
 typedef struct {
 	uint32_t *wr_buf;
@@ -167,6 +170,30 @@ unsigned int __stdcall file_write_thread(void* pParams)
 	int prior = GetThreadPriority(GetCurrentThread());
 	printf("Thread Priority = %d\n", prior);
 #endif
+
+#ifdef __linux__
+	// Set affinity mask to include CPU
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	int cpu_num = 11;
+	CPU_SET(cpu_num, &cpuset);
+	pthread_t current_thread = pthread_self();
+	pthread_setaffinity_np(current_thread, sizeof(cpuset), &cpuset);
+	// Check the actual affinity mask assigned to the thread.
+	pthread_getaffinity_np(current_thread, sizeof(cpuset), &cpuset);
+	printf("Set returned by pthread_getaffinity_np() contained:\n");
+	for (int j = 0; j < CPU_SETSIZE; j++)
+		if (CPU_ISSET(j, &cpuset))
+			printf("    CPU %d\n", j);
+#else
+	HANDLE hCurThread = GetCurrentThread();
+	uint32_t cpu_mask = 0x8; // 3-й
+	SetThreadAffinityMask(hCurThread, cpu_mask);
+	//int cpu_num = 1;
+	//SetThreadIdealProcessor(hCurThread, cpu_num);
+#endif
+
+
 	PTHREAD_PARAM pThreadParam = (PTHREAD_PARAM)pParams;
 	
 	int bsize = pThreadParam->size;
@@ -259,7 +286,7 @@ unsigned int __stdcall file_write_thread(void* pParams)
 							wrfname, ((double)writesize * (++count) / total_time) / 1000., ((double)writesize / wr_time) / 1000., ((double)writesize / max_time) / 1000.);
 
 			//	printf("\n");
-				g_read_max = (count < g_fcnt) ? count : g_fcnt;
+				//g_read_max = (count < g_fcnt) ? count : g_fcnt;
 
 				if (exit_app)
 					break;
@@ -277,6 +304,29 @@ int main(int argc, char *argv[])
 {
 	// выход по Ctrl+C
 	signal(SIGINT, signal_handler);
+
+
+#ifdef __linux__
+	// Set affinity mask to include CPU
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	int cpu_num = 15;
+	CPU_SET(cpu_num, &cpuset);
+	pthread_t current_thread = pthread_self();
+	pthread_setaffinity_np(current_thread, sizeof(cpuset), &cpuset);
+	// Check the actual affinity mask assigned to the thread.
+	pthread_getaffinity_np(current_thread, sizeof(cpuset), &cpuset);
+	printf("Set returned by pthread_getaffinity_np() contained:\n");
+	for (int j = 0; j < CPU_SETSIZE; j++)
+		if (CPU_ISSET(j, &cpuset))
+			printf("    CPU %d\n", j);
+#else
+	HANDLE hCurThread = GetCurrentThread();
+	uint32_t cpu_mask = 0x200; // 8-й
+	SetThreadAffinityMask(hCurThread, cpu_mask);
+	//int cpu_num = 1;
+	//SetThreadIdealProcessor(hCurThread, cpu_num);
+#endif
 
 	//const int bsize = 4096;
 
@@ -305,6 +355,8 @@ int main(int argc, char *argv[])
 
 	ParseCommandLine(argc, argv);
 
+	int ret = get_info_drive(drive_name);
+		
 	// Выделяем память для записи в файл
 	printf("Allocating memory for writing to file...              \n");
 	uint32_t *wrBuf = (uint32_t *)virtAlloc(SIZE_1G);
@@ -351,7 +403,7 @@ int main(int argc, char *argv[])
 			break;
 
 		int idx = 2;
-		printf("ENTER the file number (0 - %d) for reading !\n", g_read_max-1);
+		//printf("ENTER the file number (0 - %d) for reading !\n", g_read_max-1);
 		//printf("ENTER the file number for reading !\n");
 		// выход из scanf по CTRL+D под Windows и по CTRL+Z под Linux 
 		int inpch_cnt = scanf("%d", &idx);
@@ -364,8 +416,8 @@ int main(int argc, char *argv[])
 		if (exit_app)
 			break;
 
-		if (idx >= g_read_max)
-			continue;
+		//if (idx >= g_read_max)
+		//	continue;
 
 		{
 			sprintf(rdfname, "%s_%03d", file_name, idx);
@@ -384,26 +436,26 @@ int main(int argc, char *argv[])
 
 			ipc_time_t start_time, stop_time;
 			start_time = ipc_get_time();
-
+			int ret = 0;
 			if (g_direct)
 			{
 				//printf("READ (MAIN) THREAD: DIRECT & SYNC reading buffer from disk!\n");
-				int ret = file_read_direct(rdfname, rdBuf, readsize);
-				if (ret < 0)
-				{
-					read_mutex.unlock();
-					return ret;
-				}
+				ret = file_read_direct(rdfname, rdBuf, readsize);
+				//if (ret < 0)
+				//{
+				//	read_mutex.unlock();
+				//	return ret;
+				//}
 			}
 			else
 			{
 				//printf("READ (MAIN) THREAD: Reading buffer from disk by fopen()!\n");
-				int ret = file_read(rdfname, rdBuf, readsize);
-				if (ret < 0)
-				{
-					read_mutex.unlock();
-					return -1;
-				}
+				ret = file_read(rdfname, rdBuf, readsize);
+				//if (ret < 0)
+				//{
+				//	read_mutex.unlock();
+				//	return ret;
+				//}
 			}
 
 			stop_time = ipc_get_time();
@@ -411,26 +463,41 @@ int main(int argc, char *argv[])
 
 			read_mutex.unlock();
 
-			//printf("READ THREAD: Time (%s): Total %.4f s, Cur %.4f s, Max %.4f s\n",
-			//	rdfname, total_time / 1000., rd_time / 1000., max_time / 1000.);
-			//printf("READ THREAD: Speed (%s): Avr %.4f Mb/s, Cur %.4f Mb/s, Min %.4f Mb/s\r",
-			//	rdfname, ((double)readsize * (++count) / total_time) / 1000., ((double)readsize / rd_time) / 1000., ((double)readsize / max_time) / 1000.);
-			printf("READ THREAD (%s): Cur Time %.4f s, Cur Speed %.4f Mb/s\n", 
-								rdfname, rd_time / 1000., ((double)readsize / rd_time) / 1000.);
+#ifdef __linux__
+	// Set affinity mask to include CPU
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	pthread_t current_thread = pthread_self();
+	// Check the actual affinity mask assigned to the thread.
+	pthread_getaffinity_np(current_thread, sizeof(cpuset), &cpuset);
+	printf("Set returned by pthread_getaffinity_np() contained:\n");
+	for (int j = 0; j < CPU_SETSIZE; j++)
+		if (CPU_ISSET(j, &cpuset))
+			printf("    CPU %d\n", j);
+#endif
+			if (ret == 0)
+			{
+				//printf("READ THREAD: Time (%s): Total %.4f s, Cur %.4f s, Max %.4f s\n",
+				//	rdfname, total_time / 1000., rd_time / 1000., max_time / 1000.);
+				//printf("READ THREAD: Speed (%s): Avr %.4f Mb/s, Cur %.4f Mb/s, Min %.4f Mb/s\r",
+				//	rdfname, ((double)readsize * (++count) / total_time) / 1000., ((double)readsize / rd_time) / 1000., ((double)readsize / max_time) / 1000.);
+				printf("READ THREAD (%s): Cur Time %.4f s, Cur Speed %.4f Mb/s\n",
+					rdfname, rd_time / 1000., ((double)readsize / rd_time) / 1000.);
 
-			uint32_t err_cnt = 0;
-			for (int i = 0; i < bsize; i++)
-			{
-				uint32_t cmp_val = (idx << 16) + i;
-				if (rdBuf[i] != cmp_val)
-					err_cnt++;
+				uint32_t err_cnt = 0;
+				for (int i = 0; i < bsize; i++)
+				{
+					uint32_t cmp_val = (idx << 16) + i;
+					if (rdBuf[i] != cmp_val)
+						err_cnt++;
+				}
+				if (err_cnt)
+				{
+					printf(" Errors by reading: %d\n", err_cnt);
+					return -1;
+				}
+				printf("READ (MAIN) THREAD: Verifying file %s is OK                        \n", rdfname);
 			}
-			if (err_cnt)
-			{
-				printf(" Errors by reading: %d\n", err_cnt);
-				return -1;
-			}
-			printf("READ (MAIN) THREAD: Verifying file %s is OK                        \n", rdfname);
 
 		}
 	}

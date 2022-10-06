@@ -24,15 +24,15 @@ int file_write_direct(char* fname, void *buf, size_t size)
 	int hfile = open(fname, sysflag, 0666);
 	if (hfile < 0)
 	{
-		printf("error: can not open %s\n", fname);
+		printf("ERROR: can not open %s\n", fname);
 		return -1;
 	}
 	printf("Writing file %s ...                   \r", fname);
 	//size_t writesize = SIZE_1G;
 	int res = write(hfile, buf, size);
 	if (res < 0) {
-		printf("error: can not write %s\n", fname);
-		return -1;
+		printf("ERROR: can not write %s\n", fname);
+		return -2;
 	}
 	close(hfile);
 #else
@@ -49,7 +49,7 @@ int file_write_direct(char* fname, void *buf, size_t size)
 		NULL);
 	if (hfile == INVALID_HANDLE_VALUE)
 	{
-		printf("error: can not open %s\n", fname);
+		printf("ERROR: can not open %s\n", fname);
 		return -1;
 	}
 	printf("Writing file %s ...                   \r", fname);
@@ -57,8 +57,8 @@ int file_write_direct(char* fname, void *buf, size_t size)
 	int ret = WriteFile(hfile, buf, (DWORD)size, &writesize, NULL);
 	if (!ret)
 	{
-		printf("error: can not write %s\n", fname);
-		return -1;
+		printf("ERROR: can not write %s\n", fname);
+		return -2;
 	}
 	CloseHandle(hfile);
 #endif // __linux__
@@ -69,7 +69,7 @@ int file_write(char* fname, void *buf, size_t size)
 {
 	FILE *fp = fopen(fname, "wb");
 	if (!fp) {
-		printf("error: can not open %s\n", fname);
+		printf("ERROR: can not open %s\n", fname);
 		return -1;
 	}
 
@@ -77,8 +77,8 @@ int file_write(char* fname, void *buf, size_t size)
 	size_t ret = fwrite(buf, 1, size, fp);
 	if (ret != size)
 	{
-		printf("error: can not write %s\n", fname);
-		return -1;
+		printf("ERROR: can not write %s\n", fname);
+		return -2;
 	}
 
 	fclose(fp);
@@ -93,15 +93,15 @@ int file_read_direct(char* fname, void *buf, size_t size)
 	int hfile = open(fname, sysflag, 0666);
 	if (hfile < 0)
 	{
-		printf("error: can not open %s\n", fname);
+		printf("ERROR: can not open %s\n", fname);
 		return -1;
 	}
 	printf("Reading file %s ...                   \r", fname);
 	//size_t readsize = SIZE_1G;
 	int res = read(hfile, buf, size);
 	if (res < 0) {
-		printf("error: can not read %s\n", fname);
-		return -1;
+		printf("ERROR: can not read %s\n", fname);
+		return -2;
 	}
 	close(hfile);
 #else
@@ -118,7 +118,7 @@ int file_read_direct(char* fname, void *buf, size_t size)
 		NULL);
 	if (hfile == INVALID_HANDLE_VALUE)
 	{
-		printf("error: can not open %s\n", fname);
+		printf("ERROR: can not open %s\n", fname);
 		return -1;
 	}
 	printf("Reading file %s ...                   \r", fname);
@@ -126,8 +126,8 @@ int file_read_direct(char* fname, void *buf, size_t size)
 	int ret = ReadFile(hfile, buf, (DWORD)size, &readsize, NULL);
 	if (!ret)
 	{
-		printf("error: can not read %s\n", fname);
-		return -1;
+		printf("ERROR: can not read %s\n", fname);
+		return -2;
 	}
 	CloseHandle(hfile);
 #endif // __linux__
@@ -147,11 +147,166 @@ int file_read(char* fname, void *buf, size_t size)
 	if (ret != size)
 	{
 		printf("ERROR: can not read %s\n", fname);
-		return -1;
+		return -2;
 	}
 
 	//printf("MAIN: Closing file %s ...                   \n", rdfname);
 	fclose(fp);
+	return 0;
+}
+
+#ifdef _WIN32
+ULONG GetSerial(HANDLE hFile)
+{
+	static STORAGE_PROPERTY_QUERY spq = { StorageDeviceProperty, PropertyStandardQuery };
+
+	union {
+		PVOID buf;
+		PSTR psz;
+		PSTORAGE_DEVICE_DESCRIPTOR psdd;
+	};
+
+	ULONG size = sizeof(STORAGE_DEVICE_DESCRIPTOR) + 0x100;
+
+	ULONG dwError;
+
+	do
+	{
+		dwError = ERROR_NO_SYSTEM_RESOURCES;
+
+		if (buf = LocalAlloc(0, size))
+		{
+			ULONG BytesReturned;
+
+			if (DeviceIoControl(hFile, IOCTL_STORAGE_QUERY_PROPERTY, &spq, sizeof(spq), buf, size, &BytesReturned, 0))
+			{
+				if (psdd->Version >= sizeof(STORAGE_DEVICE_DESCRIPTOR))
+				{
+					if (psdd->Size > size)
+					{
+						size = psdd->Size;
+						dwError = ERROR_MORE_DATA;
+					}
+					else
+					{
+						if (psdd->SerialNumberOffset)
+						{
+							printf("Serial number - %s\n", psz + psdd->SerialNumberOffset);
+							dwError = NOERROR;
+						}
+						else
+						{
+							dwError = ERROR_NO_DATA;
+						}
+					}
+				}
+				else
+				{
+					dwError = ERROR_GEN_FAILURE;
+				}
+			}
+			else
+			{
+				dwError = GetLastError();
+			}
+
+			LocalFree(buf);
+		}
+	} while (dwError == ERROR_MORE_DATA);
+
+	return dwError;
+}
+#endif
+
+int get_info_drive(char* drvname)
+{
+#ifdef __linux__
+	//O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH | S_IWOTH
+	//int sysflag = O_WRONLY;
+	int sysflag = O_RDWR | O_DIRECT | O_SYNC;
+	int hfile = open(drvname, sysflag, 0666);
+	if (hfile < 0)
+	{
+		printf("ERROR: can not open %s\n", drvname);
+		return -1;
+	}
+
+	static struct hd_driveid hd;
+	if (!ioctl(hfile, HDIO_GET_IDENTITY, &hd))
+	{
+		printf("Serial number - %.20s\n", hd.serial_no);
+		printf("Model - %s\n", hd.model);
+		printf("Logical blocks - %d\n", hd.lba_capacity);
+		printf("Cylinders - %d\n", hd.cyls);
+		printf("Heads - %d\n", hd.heads);
+		printf("Sectors - %d\n", hd.sectors);
+	}
+	else
+		if (errno == -ENOMSG)
+			printf("No serial number available\n");
+		else
+			perror("ERROR: HDIO_GET_IDENTITY");
+	close(hfile);
+#else
+
+	//char volume_name[MAX_PATH]; // lpVolumeNameBuffer
+	//char file_system[MAX_PATH]; // lpFileSystemNameBuffer
+	//DWORD serial_no; // VolumeSerialNumber
+	//DWORD max_path_length; // MaximumComponentLength
+	//DWORD file_system_flags; // FileSystemFlags
+
+	//if (GetVolumeInformation(drvname, volume_name, sizeof(volume_name),
+	//	&serial_no, &max_path_length, &file_system_flags, file_system, sizeof(file_system)))
+	//{
+	//	printf("Volume name - %s\n", volume_name);
+	//	printf("Serial number - %u\n", serial_no);
+	//	printf("File system - %s\n", file_system);
+	//	printf("Max path length - %d\n", max_path_length);
+	//	printf("File system flags - %08X\n", file_system_flags);
+	//}
+
+	unsigned long amode = GENERIC_WRITE;
+	unsigned long cmode = OPEN_EXISTING;
+	unsigned long fattr = 0;
+	HANDLE  hfile = CreateFile(drvname,
+		amode,
+		//						FILE_SHARE_WRITE | FILE_SHARE_READ,
+		0,
+		NULL,
+		cmode,
+		fattr,
+		NULL);
+	if (hfile == INVALID_HANDLE_VALUE)
+	{
+		printf("ERROR: can not open %s\n", drvname);
+		_getch();
+		return -1;
+	}
+
+	GetSerial(hfile);
+
+	DISK_GEOMETRY pdg = { 0 }; // disk drive geometry 
+	DWORD junk = 0;                     // discard results
+	BOOL bResult = DeviceIoControl(hfile,      // device to be queried
+					IOCTL_DISK_GET_DRIVE_GEOMETRY, // operation to perform
+					NULL, 0,                       // no input buffer
+					&pdg, sizeof(pdg),            // output buffer
+					&junk,                         // # bytes returned
+					(LPOVERLAPPED)NULL);          // synchronous I/O
+
+	//printf("Drive path      = %s\n", wszDrive);
+	printf("Cylinders       = %I64d\n", pdg.Cylinders);
+	printf("Tracks/cylinder = %ld\n", (ULONG)pdg.TracksPerCylinder);
+	printf("Sectors/track   = %ld\n", (ULONG)pdg.SectorsPerTrack);
+	printf("Bytes/sector    = %ld\n", (ULONG)pdg.BytesPerSector);
+
+	ULONGLONG DiskSize = 0;    // size of the drive, in bytes
+	DiskSize = pdg.Cylinders.QuadPart * (ULONG)pdg.TracksPerCylinder *
+		(ULONG)pdg.SectorsPerTrack * (ULONG)pdg.BytesPerSector;
+	printf("Disk size  = %I64d (Bytes) or  %.2f (Gb)\n", DiskSize, (double)DiskSize / (1024 * 1024 * 1024));
+
+	CloseHandle(hfile);
+#endif // __linux__
 	return 0;
 }
 
@@ -172,7 +327,7 @@ int write2drive(void *buf, char* fname, int num)
 	int hfile = open(fname, sysflag, 0666);
 	if (hfile < 0)
 	{
-		printf("error: can not open %s\n", fname);
+		printf("ERROR: can not open %s\n", fname);
 		return -1;
 	}
 
@@ -198,13 +353,13 @@ int write2drive(void *buf, char* fname, int num)
 
 		ssize_t res = write(hfile, buf, writesize);
 		if (res < 0) {
-			printf("error: can not write %s\n", fname);
+			printf("ERROR: can not write %s\n", fname);
 			close(hfile);
 			return -1;
 		}
 		if (SIZE_1G != res)
 		{
-			printf("error: disk %s is full\n", fname);
+			printf("ERROR: disk %s is full\n", fname);
 			close(hfile);
 			return -1;
 		}
@@ -250,14 +405,14 @@ int write2drive(void *buf, char* fname, int num)
 		int ret = WriteFile(hfile, buf, SIZE_1G, &writesize, NULL);
 		if (writesize != SIZE_1G)
 		{
-			printf("error: disk %s is full\n", fname);
+			printf("ERROR: disk %s is full\n", fname);
 			CloseHandle(hfile);
 			_getch();
 			return -1;
 		}
 		if (!ret)
 		{
-			printf("error: can not write %s\n", fname);
+			printf("ERROR: can not write %s\n", fname);
 			CloseHandle(hfile);
 			_getch();
 			return -1;
@@ -294,7 +449,7 @@ int read_drive(char* fname, int num, uint32_t *read_buf, uint32_t *cmp_buf)
 	int hfile = open(fname, sysflag, 0666);
 	if (hfile < 0)
 	{
-		printf("error: can not open %s\n", fname);
+		printf("ERROR: can not open %s\n", fname);
 		return -1;
 	}
 
@@ -367,7 +522,7 @@ int read_drive(char* fname, int num, uint32_t *read_buf, uint32_t *cmp_buf)
 		NULL);
 	if (hfile == INVALID_HANDLE_VALUE)
 	{
-		printf("error: can not open %s\n", fname);
+		printf("ERROR: can not open %s\n", fname);
 		_getch();
 		return -1;
 	}
@@ -384,7 +539,7 @@ int read_drive(char* fname, int num, uint32_t *read_buf, uint32_t *cmp_buf)
 		int ret = ReadFile(hfile, read_buf, SIZE_1G, &readsize, NULL);
 		if (!ret)
 		{
-			printf("error: can not read %s\n", fname);
+			printf("ERROR: can not read %s\n", fname);
 			CloseHandle(hfile);
 			_getch();
 			return -1;
