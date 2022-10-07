@@ -4,10 +4,10 @@
     <ClCompile Include="rwthread_disk.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="cthread.cpp">
+    <ClCompile Include="lib_func\cthread.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
-    <ClCompile Include="rwdisk.cpp">
+    <ClCompile Include="lib_func\rwdisk.cpp">
       <Filter>Sources</Filter>
     </ClCompile>
   </ItemGroup>
@@ -23,13 +23,13 @@
     <None Include="Makefile" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="time_func.h">
+    <ClInclude Include="lib_func\cthread.h">
       <Filter>Headers</Filter>
     </ClInclude>
-    <ClInclude Include="mem_func.h">
+    <ClInclude Include="lib_func\mem_func.h">
       <Filter>Headers</Filter>
     </ClInclude>
-    <ClInclude Include="cthread.h">
+    <ClInclude Include="lib_func\time_func.h">
       <Filter>Headers</Filter>
     </ClInclude>
   </ItemGroup>

@@ -20,9 +20,9 @@
 //#include <linux/hdreg.h>
 #endif
 
-#include "time_func.h"
-#include "mem_func.h"
-#include "cthread.h"
+#include "lib_func/time_func.h"
+#include "lib_func/mem_func.h"
+#include "lib_func/cthread.h"
 
 #define SIZE_1G 1024*1024*1024
 #define SIZE_32M 32*1024*1024

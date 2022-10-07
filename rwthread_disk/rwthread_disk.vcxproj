@@ -167,17 +167,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="cthread.cpp" />
-    <ClCompile Include="rwdisk.cpp" />
+    <ClCompile Include="lib_func\cthread.cpp" />
+    <ClCompile Include="lib_func\rwdisk.cpp" />
     <ClCompile Include="rwthread_disk.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="cthread.h" />
-    <ClInclude Include="mem_func.h" />
-    <ClInclude Include="time_func.h" />
+    <ClInclude Include="lib_func\cthread.h" />
+    <ClInclude Include="lib_func\mem_func.h" />
+    <ClInclude Include="lib_func\time_func.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
