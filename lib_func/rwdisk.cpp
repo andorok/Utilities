@@ -4,7 +4,6 @@
 #include "windows.h"
 #include <conio.h>
 //#include <stdint.h>
-//#include <process.h> 
 #else
 #include <unistd.h> 
 //#include <sys/types.h>
@@ -295,7 +294,7 @@ int get_info_drive(char* drvname)
 					(LPOVERLAPPED)NULL);          // synchronous I/O
 
 	//printf("Drive path      = %s\n", wszDrive);
-	printf("Cylinders       = %I64d\n", pdg.Cylinders);
+	printf("Cylinders       = %I64d\n", pdg.Cylinders.QuadPart);
 	printf("Tracks/cylinder = %ld\n", (ULONG)pdg.TracksPerCylinder);
 	printf("Sectors/track   = %ld\n", (ULONG)pdg.SectorsPerTrack);
 	printf("Bytes/sector    = %ld\n", (ULONG)pdg.BytesPerSector);
@@ -312,7 +311,7 @@ int get_info_drive(char* drvname)
 
 #define SIZE_1G 1024*1024*1024
 
-int write2drive(void *buf, char* fname, int num)
+int write2drive(char* fname, void *buf, int num)
 {
 	double wr_time = 0.;
 	double total_time = 0.;
@@ -435,12 +434,13 @@ int write2drive(void *buf, char* fname, int num)
 	return 0;
 }
 
-int read_drive(char* fname, int num, uint32_t *read_buf, uint32_t *cmp_buf)
+int read_drive(char* fname, void *buf, int num)
 {
 	double rd_time = 0.;
 	double total_time = 0.;
 	double max_time = 0.;
 	int bsize = 4096;
+	uint32_t *pBuf = (uint32_t *)buf;
 
 #ifdef __linux__
 	//O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH | S_IWOTH
@@ -474,13 +474,10 @@ int read_drive(char* fname, int num, uint32_t *read_buf, uint32_t *cmp_buf)
 
 	for (int idx = 0; idx < num; idx++)
 	{
-		for (int i = 0; i < bsize; i++)
-			cmp_buf[i] = (idx << 16) + i;
-
 		ipc_time_t start_time, stop_time;
 		start_time = ipc_get_time();
 
-		ssize_t res = read(hfile, read_buf, readsize);
+		ssize_t res = read(hfile, pBuf, readsize);
 		if (res < 0) {
 			printf("error: can not read %s\n", fname);
 			close(hfile);
@@ -498,8 +495,11 @@ int read_drive(char* fname, int num, uint32_t *read_buf, uint32_t *cmp_buf)
 
 		uint32_t err_cnt = 0;
 		for (int i = 0; i < bsize; i++)
-			if (read_buf[i] != cmp_buf[i])
+		{
+			uint32_t cmp_val = (idx << 16) + i;
+			if (pBuf[i] != cmp_val)
 				err_cnt++;
+		}
 		if (err_cnt)
 		{
 			printf(" Errors by reading: %d\n", err_cnt);
@@ -530,13 +530,11 @@ int read_drive(char* fname, int num, uint32_t *read_buf, uint32_t *cmp_buf)
 	unsigned long readsize;
 	for (int idx = 0; idx < num; idx++)
 	{
-		for (int i = 0; i < bsize; i++)
-			cmp_buf[i] = (idx << 16) + i;
 
 		ipc_time_t start_time, stop_time;
 		start_time = ipc_get_time();
 
-		int ret = ReadFile(hfile, read_buf, SIZE_1G, &readsize, NULL);
+		int ret = ReadFile(hfile, pBuf, SIZE_1G, &readsize, NULL);
 		if (!ret)
 		{
 			printf("ERROR: can not read %s\n", fname);
@@ -556,8 +554,11 @@ int read_drive(char* fname, int num, uint32_t *read_buf, uint32_t *cmp_buf)
 
 		uint32_t err_cnt = 0;
 		for (int i = 0; i < bsize; i++)
-			if (read_buf[i] != cmp_buf[i])
+		{
+			uint32_t cmp_val = (idx << 16) + i;
+			if (pBuf[i] != cmp_val)
 				err_cnt++;
+		}
 		if (err_cnt)
 		{
 			printf(" Errors by reading: %d\n", err_cnt);

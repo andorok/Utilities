@@ -19,11 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{C1FFACE0-5F24-4194-9FBB-90E98CE68385}</ProjectGuid>
-    <RootNamespace>rwthread_disk</RootNamespace>
+    <ProjectGuid>{C952BADB-FCEA-46C2-9E66-62101E56747C}</ProjectGuid>
+    <RootNamespace>disk_test</RootNamespace>
     <Keyword>Win32Proj</Keyword>
     <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
-    <ProjectName>rwthread_disk</ProjectName>
+    <ProjectName>disk_test</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -164,18 +164,17 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <UACExecutionLevel>HighestAvailable</UACExecutionLevel>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\lib_func\cthread.cpp" />
     <ClCompile Include="..\lib_func\rwdisk.cpp" />
-    <ClCompile Include="rwthread_disk.cpp" />
+    <ClCompile Include="disk_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Makefile" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\lib_func\cthread.h" />
     <ClInclude Include="..\lib_func\mem_func.h" />
     <ClInclude Include="..\lib_func\time_func.h" />
   </ItemGroup>
