@@ -33,13 +33,15 @@
 #ifdef __linux__
 #define MAX_PATH          260
 char drive_name[MAX_PATH] = "/dev/sdc1";
-char file_name[MAX_PATH] = "/mnt/diskG/data";
+//char drive_name[MAX_PATH] = "/dev/nvme0n1";
+char file_name[MAX_PATH] = "../data";
+//char file_name[MAX_PATH] = "/mnt/diskG/data";
 //char file_name[MAX_PATH] = "/mnt/f/32G/data";
 #else
 //char drive_name[MAX_PATH] = "\\\\.\\G:";
 char drive_name[MAX_PATH] = "\\\\.\\C:";
-//char file_name[MAX_PATH] = "G:/wup0_";
-char file_name[MAX_PATH] = "F:/32G/data";
+char file_name[MAX_PATH] = "C:/data";
+//char file_name[MAX_PATH] = "F:/32G/data";
 #endif // __linux__
 
 int g_fcnt = 1;

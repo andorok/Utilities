@@ -9,6 +9,7 @@ DIRS += . include
 INC := $(addprefix  -I, $(DIRS))
 
 #VPATH := $(DIR)
+EXTFILES += ../lib_func/rwdisk.cpp
 
 #CFLAGS += $(INC)
 #EXTFILES += lib_pa/pageallocator.cpp

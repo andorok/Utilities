@@ -227,8 +227,7 @@ unsigned int __stdcall file_write_thread(void* pParams)
 				//	ipc_delay(250);
 				if (rdfile_num == idx)
 				{
-					rdMutex->lock();
-					rdMutex->unlock();
+					rdMutex->sync();
 				}
 
 				wrMutex->lock();
@@ -426,8 +425,7 @@ int main(int argc, char *argv[])
 			//	ipc_delay(250);
 			if (wrfile_num == idx)
 			{
-				write_mutex.lock();
-				write_mutex.unlock();
+				write_mutex.sync();
 			}
 
 			read_mutex.lock();

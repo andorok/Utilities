@@ -264,20 +264,21 @@ int get_info_drive(char* drvname)
 	//	printf("File system flags - %08X\n", file_system_flags);
 	//}
 
-	unsigned long amode = GENERIC_WRITE;
+	unsigned long amode = GENERIC_READ;
 	unsigned long cmode = OPEN_EXISTING;
 	unsigned long fattr = 0;
 	HANDLE  hfile = CreateFile(drvname,
 		amode,
-		//						FILE_SHARE_WRITE | FILE_SHARE_READ,
-		0,
+		FILE_SHARE_WRITE | FILE_SHARE_READ,
+		//0,
 		NULL,
 		cmode,
 		fattr,
 		NULL);
 	if (hfile == INVALID_HANDLE_VALUE)
 	{
-		printf("ERROR: can not open %s\n", drvname);
+		uint32_t err = GetLastError();
+		printf("ERROR: can not open %s (%d)\n", drvname, err);
 		_getch();
 		return -1;
 	}

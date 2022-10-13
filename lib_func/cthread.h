@@ -52,6 +52,7 @@ public:
 
 	inline void lock();
 	inline void unlock();
+	inline void sync();
 
 	CMutex()
 	{
@@ -105,6 +106,17 @@ void CMutex::unlock()
 #ifdef __linux__
 	pthread_mutex_unlock(&m_mutex);
 #else
+	ReleaseMutex(m_hMutex);
+#endif
+}
+
+void CMutex::sync()
+{
+#ifdef __linux__
+	pthread_mutex_lock(&m_mutex);
+	pthread_mutex_unlock(&m_mutex);
+#else
+	WaitForSingleObject(m_hMutex, INFINITE);
 	ReleaseMutex(m_hMutex);
 #endif
 }
