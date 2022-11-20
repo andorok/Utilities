@@ -3,12 +3,12 @@
 
 //#include <numa.h>
 //#include <sched.h>
-#include <math.h>
+//#include <math.h>
 
 #ifdef _WIN32
 #include "windows.h"
 #include <conio.h>
-#include <process.h> 
+//#include <process.h> 
 #else
 #include <unistd.h> 
 #include <sys/types.h>
@@ -21,6 +21,8 @@
 
 #include "../lib_func/time_func.h"
 #include "../lib_func/mem_func.h"
+#include "../lib_func/cpu_func.h"
+#include "../lib_func/cmdline.h"
 
 #define SIZE_1G 1024*1024*1024
 #define SIZE_32M 32*1024*1024
@@ -32,17 +34,30 @@
 
 #ifdef __linux__
 #define MAX_PATH          260
-char drive_name[MAX_PATH] = "/dev/sdc1";
+char drive_name[MAX_PATH] = "/dev/sda";
+//char drive_name[MAX_PATH] = "/dev/sdc1";
 //char drive_name[MAX_PATH] = "/dev/nvme0n1";
 char file_name[MAX_PATH] = "../data";
 //char file_name[MAX_PATH] = "/mnt/diskG/data";
 //char file_name[MAX_PATH] = "/mnt/f/32G/data";
 #else
 //char drive_name[MAX_PATH] = "\\\\.\\G:";
-char drive_name[MAX_PATH] = "\\\\.\\C:";
-char file_name[MAX_PATH] = "C:/data";
+char drive_name[MAX_PATH] = "\\\\.\\D:";
+char file_name[MAX_PATH] = "C:/_WORKS/data";
 //char file_name[MAX_PATH] = "F:/32G/data";
 #endif // __linux__
+
+//#pragma pack(push,1)
+//
+//// информация о параметрах работы приложения
+//typedef struct {
+//	int g_fcnt = 1;
+//	int g_direct = 0;
+//	int g_drive = 0;
+//	int g_read = 0;
+//} APP_OPTIONS, *PAPP_OPTIONS;
+//
+//#pragma pack(pop)
 
 int g_fcnt = 1;
 int g_direct = 0;
@@ -68,7 +83,7 @@ void DisplayHelp()
 void ParseCommandLine(int argc, char *argv[])
 {
 	int			ii;
-	char		*pLin, *endptr;
+	//char		*pLin, *endptr;
 
 	for (ii = 1; ii < argc; ii++)
 	{
@@ -80,38 +95,42 @@ void ParseCommandLine(int argc, char *argv[])
 		}
 
 		// Указать режим небуферизированного синхронного вывода в файл
-		if (!strcmp(argv[ii], "-dir"))
-		{
-			g_direct = 1;
-			printf("Command line: -dir\n");
-		}
+		g_direct = get_cmdl_arg(ii, argv, "-dir", ARG_TYPE_NOT_NUM, g_direct);
+		//if (!strcmp(argv[ii], "-dir"))
+		//{
+		//	g_direct = 1;
+		//	printf("Command line: -dir\n");
+		//}
 
 		// Указать режим записи на диск без файловой системы
-		if (!strcmp(argv[ii], "-drv"))
-		{
-			g_drive = 1;
-			printf("Command line: -drv\n");
-		}
+		g_drive = get_cmdl_arg(ii, argv, "-drv", ARG_TYPE_NOT_NUM, g_drive);
+		//if (!strcmp(argv[ii], "-drv"))
+		//{
+		//	g_drive = 1;
+		//	printf("Command line: -drv\n");
+		//}
 
 		// Выполнить чтение и проверку после записи
-		if (!strcmp(argv[ii], "-rd"))
-		{
-			g_read = 1;
-			printf("Command line: -rd\n");
-		}
+		g_read = get_cmdl_arg(ii, argv, "-rd", ARG_TYPE_NOT_NUM, g_read);
+		//if (!strcmp(argv[ii], "-rd"))
+		//{
+		//	g_read = 1;
+		//	printf("Command line: -rd\n");
+		//}
 
 		// Указать число записываемых файлов
-		if (tolower(argv[ii][1]) == 'n')
-		{
-			pLin = &argv[ii][2];
-			if (argv[ii][2] == '\0')
-			{
-				ii++;
-				pLin = argv[ii];
-			}
-			g_fcnt = strtoul(pLin, &endptr, 0);
-			printf("Command line: -n%d\n", g_fcnt);
-		}
+		g_fcnt = get_cmdl_arg(ii, argv, "-n", ARG_TYPE_CHR_NUM, g_fcnt);
+		//if (tolower(argv[ii][1]) == 'n')
+		//{
+		//	pLin = &argv[ii][2];
+		//	if (argv[ii][2] == '\0')
+		//	{
+		//		ii++;
+		//		pLin = argv[ii];
+		//	}
+		//	g_fcnt = strtoul(pLin, &endptr, 0);
+		//	printf("Command line: -n%d\n", g_fcnt);
+		//}
 
 	}
 }
@@ -126,10 +145,13 @@ int get_info_drive(char* drvname);
 
 int main(int argc, char *argv[])
 {
+	
+	SetAffinityCPU(3);
+
 	//int node = 0;
 	ParseCommandLine(argc, argv);
 
-	int ret = get_info_drive(drive_name);
+	/*int ret = */get_info_drive(drive_name);
 
 	// Выделяем память для записи в файл
 	printf("Allocating memory for writing to file...              \n");
@@ -156,6 +178,9 @@ int main(int argc, char *argv[])
 	double rd_time = 0.;
 	double total_time = 0.;
 	double max_time = 0.;
+	double quad_time[4] = { 0., 0., 0., 0.};
+	int idxq = 0;
+
 	size_t writesize = SIZE_1G;
 	const int bsize = SIZE_1G / sizeof(int32_t);
 
@@ -200,7 +225,12 @@ int main(int argc, char *argv[])
 			if (wr_time > max_time)
 				max_time = wr_time;
 
-			printf("WRITE Speed (%s): Avr %.4f Mb/s, Cur %.4f Mb/s, Min %.4f Mb/s\r", wrfname, ((double)writesize * (idx + 1) / total_time) / 1000., ((double)writesize / wr_time) / 1000., ((double)writesize / max_time) / 1000.);
+			quad_time[idxq++] = wr_time;
+			if (idxq == 4) idxq = 0;
+			double quad_avr = ((double)writesize * 4 / (quad_time[0] + quad_time[1] + quad_time[2] + quad_time[3])) / 1000.;
+
+			printf("WRITE Speed (%s): Avr %.4f Mb/s (%.4f), Cur %.4f Mb/s, Min %.4f Mb/s\r", wrfname, 
+				((double)writesize * (idx + 1) / total_time) / 1000., quad_avr, ((double)writesize / wr_time) / 1000., ((double)writesize / max_time) / 1000.);
 
 			printf("\n");
 
@@ -263,6 +293,13 @@ int main(int argc, char *argv[])
 		}
 	}
 
+#ifdef _WIN32
+	//if (g_key)
+	{
+		printf("Press any key to quit of program\n");
+		_getch();
+	}
+#endif
 	return 0;
 }
 

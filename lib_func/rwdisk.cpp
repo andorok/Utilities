@@ -12,6 +12,7 @@
 #include <sys/ioctl.h>
 //#include <errno.h>
 #include <linux/hdreg.h>
+#include <linux/fs.h>
 #endif
 
 #include "time_func.h"
@@ -234,17 +235,24 @@ int get_info_drive(char* drvname)
 	if (!ioctl(hfile, HDIO_GET_IDENTITY, &hd))
 	{
 		printf("Serial number - %.20s\n", hd.serial_no);
-		printf("Model - %s\n", hd.model);
-		printf("Logical blocks - %d\n", hd.lba_capacity);
+		printf("Model - %.40s\n", hd.model);
+		printf("Logical blocks - %lld (%d)\n", hd.lba_capacity_2, hd.lba_capacity);
 		printf("Cylinders - %d\n", hd.cyls);
 		printf("Heads - %d\n", hd.heads);
 		printf("Sectors - %d\n", hd.sectors);
+		//printf("track_bytes - %d\n", hd.track_bytes);
+		//printf("sector_bytes - %d\n", hd.sector_bytes);
 	}
 	else
 		if (errno == -ENOMSG)
 			printf("No serial number available\n");
 		else
 			perror("ERROR: HDIO_GET_IDENTITY");
+
+	unsigned long long numblocks = 0;
+	ioctl(hfile, BLKGETSIZE64, &numblocks);
+	printf("Number of bytes: %llu, this makes %.3f GB\n",
+							numblocks, (double)numblocks / (1024 * 1024 * 1024));
 	close(hfile);
 #else
 
@@ -317,7 +325,8 @@ int write2drive(char* fname, void *buf, int num)
 	double wr_time = 0.;
 	double total_time = 0.;
 	double max_time = 0.;
-	int bsize = 4096;
+	//int bsize = 4096;
+	const int bsize = SIZE_1G / sizeof(int32_t);
 	uint32_t *pBuf = (uint32_t *)buf;
 
 #ifdef __linux__
@@ -330,15 +339,6 @@ int write2drive(char* fname, void *buf, int num)
 		printf("ERROR: can not open %s\n", fname);
 		return -1;
 	}
-
-	static struct hd_driveid hd;
-	if (!ioctl(hfile, HDIO_GET_IDENTITY, &hd))
-		printf("S/N %.20s\n", hd.serial_no);
-	else
-		if (errno == -ENOMSG)
-			printf("No serial number available\n");
-		else
-			perror("ERROR: HDIO_GET_IDENTITY");
 
 	printf("Writing file %s ...                   \n", fname);
 	size_t writesize = SIZE_1G;
@@ -440,7 +440,8 @@ int read_drive(char* fname, void *buf, int num)
 	double rd_time = 0.;
 	double total_time = 0.;
 	double max_time = 0.;
-	int bsize = 4096;
+	//int bsize = 4096;
+	const int bsize = SIZE_1G / sizeof(int32_t);
 	uint32_t *pBuf = (uint32_t *)buf;
 
 #ifdef __linux__
@@ -564,6 +565,161 @@ int read_drive(char* fname, void *buf, int num)
 		{
 			printf(" Errors by reading: %d\n", err_cnt);
 			break;
+		}
+		printf("Verifying is OK\n");
+
+	}
+	CloseHandle(hfile);
+	//printf("\nPress any key to quit of program\n");
+	printf("\nPress any key....\n");
+	_getch();
+#endif // __linux__
+	return 0;
+}
+
+int read_drive_block(char* fname, void *buf, int idx)
+{
+	double rd_time = 0.;
+	double total_time = 0.;
+	double max_time = 0.;
+	//int bsize = 4096;
+	const int bsize = SIZE_1G / sizeof(int32_t);
+	uint32_t *pBuf = (uint32_t *)buf;
+
+#ifdef __linux__
+	//O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH | S_IWOTH
+	//int sysflag = O_WRONLY;
+	int sysflag = O_RDWR | O_DIRECT | O_SYNC;
+	int hfile = open(fname, sysflag, 0666);
+	if (hfile < 0)
+	{
+		printf("ERROR: can not open %s\n", fname);
+		return -1;
+	}
+
+	static struct hd_driveid hd;
+	if (!ioctl(hfile, HDIO_GET_IDENTITY, &hd))
+	{
+		printf("Serial number - %.20s\n", hd.serial_no);
+		printf("Model - %s\n", hd.model);
+		printf("Logical blocks - %d\n", hd.lba_capacity);
+		printf("Cylinders - %d\n", hd.cyls);
+		printf("Heads - %d\n", hd.heads);
+		printf("Sectors - %d\n", hd.sectors);
+	}
+	else
+		if (errno == -ENOMSG)
+			printf("No serial number available\n");
+		else
+			perror("ERROR: HDIO_GET_IDENTITY");
+
+	printf("Reading file %s ...                   \n", fname);
+	size_t readsize = SIZE_1G;
+
+    off_t offset = (uint64_t)idx * SIZE_1G;
+    off_t new_offset = lseek(hfile, offset, SEEK_SET);
+
+	//for (int idx = 0; idx < num; idx++)
+	{
+		ipc_time_t start_time, stop_time;
+		start_time = ipc_get_time();
+
+		ssize_t res = read(hfile, pBuf, readsize);
+		if (res < 0) {
+			printf("error: can not read %s\n", fname);
+            close(hfile);
+			return -1;
+		}
+		stop_time = ipc_get_time();
+		rd_time = ipc_get_nano_difftime(start_time, stop_time) / 1000000.;
+
+		total_time += rd_time;
+		if (rd_time > max_time)
+			max_time = rd_time;
+
+		printf("Speed (%d): Avr %.4f Mb/s, Cur %.4f Mb/s, Min %.4f Mb/s\r", idx, ((double)readsize * (idx + 1) / total_time) / 1000., ((double)readsize / rd_time) / 1000., ((double)readsize / max_time) / 1000.);
+		printf("\n");
+
+		uint32_t err_cnt = 0;
+		for (int i = 0; i < bsize; i++)
+		{
+			uint32_t cmp_val = (idx << 16) + i;
+			if (pBuf[i] != cmp_val)
+				err_cnt++;
+		}
+		if (err_cnt)
+		{
+			printf(" Errors by reading: %d\n", err_cnt);
+            //break;
+            close(hfile);
+            return -1;
+        }
+		printf("Verifying is OK\n");
+	}
+	close(hfile);
+#else
+	unsigned long amode = GENERIC_READ;
+	unsigned long cmode = OPEN_EXISTING;
+	unsigned long fattr = 0;
+	HANDLE  hfile = CreateFile(fname,
+		amode,
+		//						FILE_SHARE_WRITE | FILE_SHARE_READ,
+		0,
+		NULL,
+		cmode,
+		fattr,
+		NULL);
+	if (hfile == INVALID_HANDLE_VALUE)
+	{
+		printf("ERROR: can not open %s\n", fname);
+		_getch();
+		return -1;
+	}
+	printf("Reading file %s ...                   \n", fname);
+	unsigned long readsize;
+
+	uint64_t offset = (uint64_t)idx * SIZE_1G;
+	long lo_offset = (long)offset;
+	long hi_offset = (long)(offset >> 32);
+	uint32_t lo_new_offset = SetFilePointer(hfile, lo_offset, &hi_offset, FILE_BEGIN);
+
+	//for (int idx = 0; idx < num; idx++)
+	{
+		ipc_time_t start_time, stop_time;
+		start_time = ipc_get_time();
+
+		int ret = ReadFile(hfile, pBuf, SIZE_1G, &readsize, NULL);
+		if (!ret)
+		{
+			printf("ERROR: can not read %s\n", fname);
+			CloseHandle(hfile);
+			_getch();
+			return -1;
+		}
+		stop_time = ipc_get_time();
+		rd_time = ipc_get_nano_difftime(start_time, stop_time) / 1000000.;
+
+		total_time += rd_time;
+		if (rd_time > max_time)
+			max_time = rd_time;
+
+		printf("Speed (%d): Avr %.4f Mb/s, Cur %.4f Mb/s, Min %.4f Mb/s\r", idx, ((double)readsize * (idx + 1) / total_time) / 1000., ((double)readsize / rd_time) / 1000., ((double)readsize / max_time) / 1000.);
+		printf("\n");
+
+		uint32_t err_cnt = 0;
+		for (int i = 0; i < bsize; i++)
+		{
+			uint32_t cmp_val = (idx << 16) + i;
+			if (pBuf[i] != cmp_val)
+				err_cnt++;
+		}
+		if (err_cnt)
+		{
+			printf(" Errors by reading: %d\n", err_cnt);
+			//break;
+			CloseHandle(hfile);
+			_getch();
+			return -1;
 		}
 		printf("Verifying is OK\n");
 
