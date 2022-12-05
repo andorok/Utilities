@@ -163,3 +163,57 @@ int CFile::write(void *buf, size_t size)
 	return 0;
 }
 
+int CFile::seek(size_t pos, int method)
+{
+	//fseek();
+#ifdef __linux__
+	//off_t offset = (off_t)pos;
+	//off_t new_offset = lseek(m_hfile, offset, method);
+	off_t new_offset = lseek(m_hfile, pos, method);
+	if (new_offset < 0) {
+		printf("ERROR: can not seek  %s\n", m_fname.c_str());
+		return -1;
+	}
+#else
+	// match (совпадают)
+	//if (method == SEEK_SET)
+	//	method = FILE_BEGIN;
+	//else
+	//	if (method == SEEK_CUR)
+	//		method = FILE_CURRENT;
+	//	else
+	//		if (method == SEEK_END)
+	//			method = FILE_END;
+
+	long lo_offset = (long)pos;
+	long hi_offset = (long)(pos >> 32);
+	uint32_t lo_new_offset = SetFilePointer(m_hfile, lo_offset, &hi_offset, method);
+	if (lo_new_offset == 0xFFFFFFFF) {
+		printf("ERROR: can not seek  %s\n", m_fname.c_str());
+		return -1;
+	};
+#endif // __linux__
+	return 0;
+}
+
+int CFile::size(size_t* size)
+{
+#ifdef __linux__
+	struct stat finfo;
+	int res = fstat(m_hfile, &finfo);
+	if (res < 0) {
+		printf("ERROR: can not get size of file %s\n", m_fname.c_str());
+		return -1;
+	}
+	*size = (size_t)finfo.st_size;
+#else
+	LARGE_INTEGER file_size;
+	int ret = GetFileSizeEx(m_hfile, &file_size);
+	if (!ret) {
+		printf("ERROR: can not get size of file %s\n", m_fname.c_str());
+		return -1;
+	};
+	*size = (size_t)file_size.QuadPart;
+#endif // __linux__
+	return 0;
+}

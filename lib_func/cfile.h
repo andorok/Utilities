@@ -61,6 +61,9 @@ public:
 	int write(void *buf, size_t size);
 	int close();
 
+	int seek(size_t pos, int method);
+	int size(size_t* size);
+
 	CFile();
 	~CFile();
 };

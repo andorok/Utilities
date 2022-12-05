@@ -189,9 +189,36 @@ ULONG GetSerial(HANDLE hFile)
 					}
 					else
 					{
+						if (psdd->VendorIdOffset)
+						{
+							printf("Vendor ID: %s\n", psz + psdd->VendorIdOffset);
+							dwError = NOERROR;
+						}
+						else
+						{
+							dwError = ERROR_NO_DATA;
+						}
+						if (psdd->ProductIdOffset)
+						{
+							printf("Product ID: %s\n", psz + psdd->ProductIdOffset);
+							dwError = NOERROR;
+						}
+						else
+						{
+							dwError = ERROR_NO_DATA;
+						}
+						if (psdd->ProductRevisionOffset)
+						{
+							printf("Product Revision: %s\n", psz + psdd->ProductRevisionOffset);
+							dwError = NOERROR;
+						}
+						else
+						{
+							dwError = ERROR_NO_DATA;
+						}
 						if (psdd->SerialNumberOffset)
 						{
-							printf("Serial number - %s\n", psz + psdd->SerialNumberOffset);
+							printf("Serial number: %s\n", psz + psdd->SerialNumberOffset);
 							dwError = NOERROR;
 						}
 						else
@@ -220,6 +247,8 @@ ULONG GetSerial(HANDLE hFile)
 
 int get_info_drive(char* drvname)
 {
+	printf("Device %s :\n", drvname);
+
 #ifdef __linux__
 	//O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH | S_IWOTH
 	//int sysflag = O_WRONLY;
@@ -236,10 +265,11 @@ int get_info_drive(char* drvname)
 	{
 		printf("Serial number - %.20s\n", hd.serial_no);
 		printf("Model - %.40s\n", hd.model);
-		printf("Logical blocks - %lld (%d)\n", hd.lba_capacity_2, hd.lba_capacity);
-		printf("Cylinders - %d\n", hd.cyls);
-		printf("Heads - %d\n", hd.heads);
-		printf("Sectors - %d\n", hd.sectors);
+		printf("%lld sectors\n", hd.lba_capacity_2);
+		//printf("Logical blocks - %lld (%d)\n", hd.lba_capacity_2, hd.lba_capacity);
+		//printf("Cylinders - %d\n", hd.cyls);
+		//printf("Heads - %d\n", hd.heads);
+		//printf("Sectors - %d\n", hd.sectors);
 		//printf("track_bytes - %d\n", hd.track_bytes);
 		//printf("sector_bytes - %d\n", hd.sector_bytes);
 	}
@@ -251,8 +281,9 @@ int get_info_drive(char* drvname)
 
 	unsigned long long numblocks = 0;
 	ioctl(hfile, BLKGETSIZE64, &numblocks);
-	printf("Number of bytes: %llu, this makes %.3f GB\n",
-							numblocks, (double)numblocks / (1024 * 1024 * 1024));
+	//printf("Number of bytes: %llu, this makes %.3f GB\n",
+	//						numblocks, (double)numblocks / (1024 * 1024 * 1024));
+	printf("%.2f GiB, %llu bytes\n", (double)numblocks / (1024 * 1024 * 1024), numblocks);
 	close(hfile);
 #else
 
@@ -291,10 +322,38 @@ int get_info_drive(char* drvname)
 		return -1;
 	}
 
+	//STORAGE_PROPERTY_QUERY query = { 0 };
+	//STORAGE_DEVICE_DESCRIPTOR *dd;
+	DWORD junk = 0;                     // discard results
+	//char ptr[1024];
+
+	//query.PropertyId = StorageDeviceProperty;
+	//query.QueryType = PropertyStandardQuery;
+
+	//BOOL bResult = DeviceIoControl(hfile,
+	//	IOCTL_STORAGE_QUERY_PROPERTY,
+	//	&query,
+	//	sizeof(query),
+	//	ptr,
+	//	1024,
+	//	&junk,
+	//	NULL);
+
+	//if (!bResult) {
+	//	printf("Opps: %lu\n", GetLastError());
+	//}
+	//else {
+	//	dd = (STORAGE_DEVICE_DESCRIPTOR *)ptr;
+
+	//	printf("%s\t%u\n", ((char*)dd) + dd->VendorIdOffset, dd->VendorIdOffset);
+	//	printf("%s\t%u\n", ((char*)dd) + dd->ProductIdOffset, dd->ProductIdOffset);
+	//	printf("%s\t%u\n", ((char*)dd) + dd->ProductRevisionOffset, dd->ProductRevisionOffset);
+	//	printf("%s\t%u\n", ((char*)dd) + dd->SerialNumberOffset, dd->SerialNumberOffset);
+	//}
+
 	GetSerial(hfile);
 
 	DISK_GEOMETRY pdg = { 0 }; // disk drive geometry 
-	DWORD junk = 0;                     // discard results
 	BOOL bResult = DeviceIoControl(hfile,      // device to be queried
 					IOCTL_DISK_GET_DRIVE_GEOMETRY, // operation to perform
 					NULL, 0,                       // no input buffer
@@ -728,6 +787,18 @@ int read_drive_block(char* fname, void *buf, int idx)
 	//printf("\nPress any key to quit of program\n");
 	printf("\nPress any key....\n");
 	_getch();
+#endif // __linux__
+	return 0;
+}
+
+int file_delete(char* fname)
+{
+	//remove(fname);
+	//printf("Deleting file %s ...                   \r", fname);
+#ifdef __linux__
+	unlink(fname);
+#else
+	DeleteFile(fname);
 #endif // __linux__
 	return 0;
 }
