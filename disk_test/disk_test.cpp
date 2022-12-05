@@ -257,7 +257,7 @@ int main(int argc, char *argv[])
 			{
 				printf("DIRECT & SYNC reading buffer from disk!\r");
 				ret = file_read_direct(rdfname, rdBuf, readsize);
-			}
+				//ret = read_drive_block(drive_name, rdBuf, g_fcnt / 2);			}
 			else
 			{
 				printf("Reading buffer from disk by fopen()!\r");
