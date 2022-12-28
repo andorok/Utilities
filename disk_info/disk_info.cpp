@@ -13,14 +13,14 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 //#include <errno.h>
-#include <linux/hdreg.h>
+//#include <linux/hdreg.h>
 #endif
 
-#include "../lib_func/cpu_func.h"
+//#include "../lib_func/cpu_func.h"
 #include "../lib_func/cmdline.h"
 
-#include <cstring>
-#include <tuple>
+//#include <cstring>
+//#include <tuple>
 
 #ifdef __linux__
 #define MAX_PATH          260
@@ -82,7 +82,7 @@ void ParseCommandLine(int argc, char *argv[])
 		}
 
 		// Указать режим небуферизированного синхронного вывода в файл
-		g_direct = get_cmdl_arg(ii, argv, "-dir", ARG_TYPE_NOT_NUM, g_direct);
+//		g_direct = get_cmdl_arg(ii, argv, "-dir", ARG_TYPE_NOT_NUM, g_direct);
 		//if (!strcmp(argv[ii], "-dir"))
 		//{
 		//	g_direct = 1;
@@ -90,7 +90,7 @@ void ParseCommandLine(int argc, char *argv[])
 		//}
 
 		// Указать режим записи на диск без файловой системы
-		g_drive = get_cmdl_arg(ii, argv, "-drv", ARG_TYPE_NOT_NUM, g_drive);
+		//g_drive = get_cmdl_arg(ii, argv, "-drv", ARG_TYPE_NOT_NUM, g_drive);
 		//if (!strcmp(argv[ii], "-drv"))
 		//{
 		//	g_drive = 1;
@@ -98,7 +98,7 @@ void ParseCommandLine(int argc, char *argv[])
 		//}
 
 		// Выполнить чтение и проверку после записи
-		g_read = get_cmdl_arg(ii, argv, "-rd", ARG_TYPE_NOT_NUM, g_read);
+		//g_read = get_cmdl_arg(ii, argv, "-rd", ARG_TYPE_NOT_NUM, g_read);
 		//if (!strcmp(argv[ii], "-rd"))
 		//{
 		//	g_read = 1;
@@ -106,7 +106,7 @@ void ParseCommandLine(int argc, char *argv[])
 		//}
 
 		// Указать число записываемых файлов
-		g_fcnt = get_cmdl_arg(ii, argv, "-n", ARG_TYPE_CHR_NUM, g_fcnt);
+		//g_fcnt = get_cmdl_arg(ii, argv, "-n", ARG_TYPE_CHR_NUM, g_fcnt);
 		//if (tolower(argv[ii][1]) == 'n')
 		//{
 		//	pLin = &argv[ii][2];
@@ -130,7 +130,17 @@ int main(int argc, char *argv[])
 
 	ParseCommandLine(argc, argv);
 
-	get_info_drive(drive_name);
+	int ret = 0;
+	char strname[MAX_PATH] = "\\\\.\\PhysicalDrive";
+	int phys_num = 0;
+	char drive_name[MAX_PATH];
+	do
+	{
+		printf("\n");
+		sprintf(drive_name, "%s%d", strname, phys_num);
+		ret = get_info_drive(drive_name);
+		phys_num++;
+	} while (ret >= 0);
 
 #ifdef _WIN32
 	//if (g_key)

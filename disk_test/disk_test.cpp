@@ -43,7 +43,8 @@ char file_name[MAX_PATH] = "../data";
 #else
 //char drive_name[MAX_PATH] = "\\\\.\\G:";
 char drive_name[MAX_PATH] = "\\\\.\\D:";
-char file_name[MAX_PATH] = "C:/_WORKS/data";
+//char file_name[MAX_PATH] = "C:/_WORKS/data";
+char file_name[MAX_PATH] = "H:/data";
 //char file_name[MAX_PATH] = "F:/32G/data";
 #endif // __linux__
 
@@ -258,7 +259,8 @@ int main(int argc, char *argv[])
 			{
 				printf("DIRECT & SYNC reading buffer from disk!\r");
 				ret = file_read_direct(rdfname, rdBuf, readsize);
-				//ret = read_drive_block(drive_name, rdBuf, g_fcnt / 2);			}
+				//ret = read_drive_block(drive_name, rdBuf, g_fcnt / 2);		
+			}
 			else
 			{
 				printf("Reading buffer from disk by fopen()!\r");

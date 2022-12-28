@@ -319,7 +319,7 @@ int get_info_drive(char* drvname)
 	{
 		uint32_t err = GetLastError();
 		printf("ERROR: can not open %s (%d)\n", drvname, err);
-		_getch();
+		//_getch();
 		return -1;
 	}
 
