@@ -29,7 +29,8 @@ char drive_name[MAX_PATH] = "/dev/sda";
 //char drive_name[MAX_PATH] = "/dev/nvme0n1";
 #else
 //#define wszPath L"\\\\.\\PhysicalDrive0"
-char drive_name[MAX_PATH] = "\\\\.\\G:";
+char drive_name[MAX_PATH] = "\\\\.\\H:";
+//char drive_name[MAX_PATH] = "\\\\.\\G:";
 //char drive_name[MAX_PATH] = "\\\\.\\F:";
 //char drive_name[MAX_PATH] = "\\\\.\\D:";
 #endif // __linux__

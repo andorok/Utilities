@@ -191,6 +191,7 @@ int main(int argc, char *argv[])
 		if (g_read)
 		{
 			ret = read_drive(drive_name, rdBuf, g_fcnt);
+			//ret = read_drive_block(drive_name, rdBuf, g_fcnt / 2);
 		}
 		return ret;
 	}

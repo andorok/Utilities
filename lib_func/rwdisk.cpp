@@ -32,6 +32,7 @@ int file_write_direct(char* fname, void *buf, size_t size)
 	int res = write(hfile, buf, size);
 	if (res < 0) {
 		printf("ERROR: can not write %s\n", fname);
+		perror("ERROR: write");
 		return -2;
 	}
 	close(hfile);
