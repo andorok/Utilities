@@ -29,6 +29,7 @@
 #define SIZE_16M 16*1024*1024
 #define SIZE_1M 1024*1024
 
+#include <csignal>
 #include <cstring>
 #include <tuple>
 
@@ -42,7 +43,7 @@ char file_name[MAX_PATH] = "../data";
 //char file_name[MAX_PATH] = "/mnt/f/32G/data";
 #else
 //char drive_name[MAX_PATH] = "\\\\.\\G:";
-char drive_name[MAX_PATH] = "\\\\.\\D:";
+char drive_name[MAX_PATH] = "\\\\.\\H:";
 //char file_name[MAX_PATH] = "C:/_WORKS/data";
 char file_name[MAX_PATH] = "H:/data";
 //char file_name[MAX_PATH] = "F:/32G/data";
@@ -64,6 +65,15 @@ int g_fcnt = 1;
 int g_direct = 0;
 int g_drive = 0;
 int g_read = 0;
+double g_speed_limit = 1800.;
+
+static bool exit_app = false;
+void signal_handler(int signo)
+{
+	fprintf(stderr, "\nSignal CTRL+C\n");
+	signo = signo;
+	exit_app = true;
+}
 
 // Вывести подсказку
 void DisplayHelp()
@@ -146,7 +156,9 @@ int get_info_drive(char* drvname);
 
 int main(int argc, char *argv[])
 {
-	
+	// выход по Ctrl+C
+	signal(SIGINT, signal_handler);
+
 	SetAffinityCPU(3);
 
 	//int node = 0;
@@ -197,46 +209,58 @@ int main(int argc, char *argv[])
 		return ret;
 	}
 
-    for (int idx = 0; idx < g_fcnt; idx++)
+	int count = 0;
+	int cycle = 0;
+	while (!exit_app)
 	{
-		for (int i = 0; i < bsize; i++)
-			wrBuf[i] = (idx << 16) + i;
-
-		int ret = 0;
-		sprintf(wrfname, "%s_%03d", file_name, idx);
-
-        ipc_time_t start_time, stop_time;
-		start_time = ipc_get_time();
-
-		if (g_direct)
+		for (int idx = 0; idx < g_fcnt; idx++)
 		{
-            printf("DIRECT & SYNC writing buffer on disk!\r");
-			ret = file_write_direct(wrfname, wrBuf, writesize);
+			for (int i = 0; i < bsize; i++)
+				wrBuf[i] = (idx << 16) + i;
+
+			int ret = 0;
+			sprintf(wrfname, "%s_%04d", file_name, idx);
+
+			ipc_time_t start_time, stop_time;
+			start_time = ipc_get_time();
+
+			if (g_direct)
+			{
+				printf("DIRECT & SYNC writing buffer on disk!\r");
+				ret = file_write_direct(wrfname, wrBuf, writesize);
+			}
+			else
+			{
+				ret = file_write(wrfname, wrBuf, writesize);
+			}
+
+			stop_time = ipc_get_time();
+			wr_time = ipc_get_nano_difftime(start_time, stop_time) / 1000000.;
+
+			if (ret == 0)
+			{
+				total_time += wr_time;
+				if (wr_time > max_time)
+					max_time = wr_time;
+
+				quad_time[idxq++] = wr_time;
+				if (idxq == 4) idxq = 0;
+				double quad_avr = ((double)writesize * 4 / (quad_time[0] + quad_time[1] + quad_time[2] + quad_time[3])) / 1000.;
+
+				//double speed_avr = ((double)writesize * (idx + 1) / total_time) / 1000.;
+				double speed_avr = ((double)writesize * (++count) / total_time) / 1000.;
+				double speed_cur = ((double)writesize / wr_time) / 1000.;
+				double speed_min = ((double)writesize / max_time) / 1000.;
+
+				printf("WRITE Speed (%d %s): Avr %.4f Mb/s (%.4f), Cur %.4f Mb/s, Min %.4f Mb/s\r", cycle, wrfname, speed_avr, quad_avr, speed_cur, speed_min);
+				if (speed_cur < g_speed_limit)
+					printf("\n");
+
+			}
+			if (exit_app)
+				break;
 		}
-		else
-		{
-			ret = file_write(wrfname, wrBuf, writesize);
-		}
-
-		stop_time = ipc_get_time();
-		wr_time = ipc_get_nano_difftime(start_time, stop_time) / 1000000.;
-
-		if (ret == 0)
-		{
-			total_time += wr_time;
-			if (wr_time > max_time)
-				max_time = wr_time;
-
-			quad_time[idxq++] = wr_time;
-			if (idxq == 4) idxq = 0;
-			double quad_avr = ((double)writesize * 4 / (quad_time[0] + quad_time[1] + quad_time[2] + quad_time[3])) / 1000.;
-
-			printf("WRITE Speed (%s): Avr %.4f Mb/s (%.4f), Cur %.4f Mb/s, Min %.4f Mb/s\r", wrfname, 
-				((double)writesize * (idx + 1) / total_time) / 1000., quad_avr, ((double)writesize / wr_time) / 1000., ((double)writesize / max_time) / 1000.);
-
-			printf("\n");
-
-		}
+		cycle++;
 	}
 
 	if (g_read)

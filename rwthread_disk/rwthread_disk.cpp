@@ -221,7 +221,7 @@ unsigned int __stdcall file_write_thread(void* pParams)
 				for (int i = 0; i < bsize; i++)
 					wrBuf[i] = (idx << 16) + i;
 
-				sprintf(wrfname, "%s_%03d", file_name, idx);
+				sprintf(wrfname, "%s_%04d", file_name, idx);
 
 				//while (rdfile_num == idx)
 				//	ipc_delay(250);
