@@ -33,4 +33,8 @@
       <Filter>Headers</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\..\log4cpp\msvc10\log4cppLIB\Release\log4cppLIB.lib" />
+    <Library Include="..\..\log4cpp\msvc10\log4cppLIB\Debug\log4cppD.lib" />
+  </ItemGroup>
 </Project>

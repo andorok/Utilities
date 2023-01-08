@@ -24,9 +24,19 @@
 #include "../lib_func/cpu_func.h"
 #include "../lib_func/cmdline.h"
 
-#define SIZE_1G 1024*1024*1024
-#define SIZE_32M 32*1024*1024
-#define SIZE_16M 16*1024*1024
+#include "log4cpp/Category.hh"
+#include "log4cpp/Appender.hh"
+#include "log4cpp/FileAppender.hh"
+#include "log4cpp/OstreamAppender.hh"
+#include "log4cpp/Layout.hh"
+#include "log4cpp/BasicLayout.hh"
+#include "log4cpp/Priority.hh"
+#include "log4cpp/RollingFileAppender.hh"
+#include "log4cpp/PatternLayout.hh"
+
+//#define SIZE_1G 1024*1024*1024
+//#define SIZE_32M 32*1024*1024
+//#define SIZE_16M 16*1024*1024
 #define SIZE_1M 1024*1024
 
 #include <csignal>
@@ -42,9 +52,10 @@ char file_name[MAX_PATH] = "../data";
 //char file_name[MAX_PATH] = "/mnt/diskG/data";
 //char file_name[MAX_PATH] = "/mnt/f/32G/data";
 #else
+//char drive_name[MAX_PATH] = "\\\\.\\C:";
+//char file_name[MAX_PATH] = "C:/_WORKS/data";
 //char drive_name[MAX_PATH] = "\\\\.\\G:";
 char drive_name[MAX_PATH] = "\\\\.\\H:";
-//char file_name[MAX_PATH] = "C:/_WORKS/data";
 char file_name[MAX_PATH] = "H:/data";
 //char file_name[MAX_PATH] = "F:/32G/data";
 #endif // __linux__
@@ -66,6 +77,7 @@ int g_direct = 0;
 int g_drive = 0;
 int g_read = 0;
 double g_speed_limit = 1800.;
+int g_fsize = 1024;
 
 static bool exit_app = false;
 void signal_handler(int signo)
@@ -107,41 +119,19 @@ void ParseCommandLine(int argc, char *argv[])
 
 		// Указать режим небуферизированного синхронного вывода в файл
 		g_direct = get_cmdl_arg(ii, argv, "-dir", ARG_TYPE_NOT_NUM, g_direct);
-		//if (!strcmp(argv[ii], "-dir"))
-		//{
-		//	g_direct = 1;
-		//	printf("Command line: -dir\n");
-		//}
 
 		// Указать режим записи на диск без файловой системы
 		g_drive = get_cmdl_arg(ii, argv, "-drv", ARG_TYPE_NOT_NUM, g_drive);
-		//if (!strcmp(argv[ii], "-drv"))
-		//{
-		//	g_drive = 1;
-		//	printf("Command line: -drv\n");
-		//}
 
 		// Выполнить чтение и проверку после записи
 		g_read = get_cmdl_arg(ii, argv, "-rd", ARG_TYPE_NOT_NUM, g_read);
-		//if (!strcmp(argv[ii], "-rd"))
-		//{
-		//	g_read = 1;
-		//	printf("Command line: -rd\n");
-		//}
 
 		// Указать число записываемых файлов
 		g_fcnt = get_cmdl_arg(ii, argv, "-n", ARG_TYPE_CHR_NUM, g_fcnt);
-		//if (tolower(argv[ii][1]) == 'n')
-		//{
-		//	pLin = &argv[ii][2];
-		//	if (argv[ii][2] == '\0')
-		//	{
-		//		ii++;
-		//		pLin = argv[ii];
-		//	}
-		//	g_fcnt = strtoul(pLin, &endptr, 0);
-		//	printf("Command line: -n%d\n", g_fcnt);
-		//}
+
+		// Указать размер файла
+		g_fsize = get_cmdl_arg(ii, argv, "-s", ARG_TYPE_CHR_NUM, g_fsize);
+		g_fsize *= 1024 * 1024;
 
 	}
 }
@@ -161,6 +151,19 @@ int main(int argc, char *argv[])
 
 	SetAffinityCPU(3);
 
+	// создаем отсылатель сообщений в файл (с поддержкой ротации по размеру)
+	std::string log_file = "disk_test.log";
+	log4cpp::Appender *appender2 = new log4cpp::RollingFileAppender("default", log_file, 16 * 1024 * 1024, 8);
+
+	// настраиваем уровень логгирования
+	log4cpp::Category& _LOG = log4cpp::Category::getRoot();
+	//_LOG.setPriority(log4cpp::Priority::NOTICE);
+	_LOG.setPriority(log4cpp::Priority::INFO);
+	_LOG.addAppender(appender2);
+
+	//_LOG << log4cpp::Priority::NOTICE << _log.message(start_message);
+	_LOG << log4cpp::Priority::INFO << "Started root logging";
+
 	//int node = 0;
 	ParseCommandLine(argc, argv);
 
@@ -168,21 +171,19 @@ int main(int argc, char *argv[])
 
 	// Выделяем память для записи в файл
 	printf("Allocating memory for writing to file...              \n");
-	uint32_t *wrBuf = (uint32_t *)virtAlloc(SIZE_1G);
+	uint32_t *wrBuf = (uint32_t *)virtAlloc(g_fsize);
 	if (!wrBuf)
 	{
-		//printf("error: can not alloc %d Mbytes\n", SIZE_32M / SIZE_1M);
-		printf("ERROR: can not alloc %d Mbytes for writing to file\n", SIZE_1G / SIZE_1M);
+		printf("ERROR: can not alloc %d Mbytes for writing to file\n", g_fsize / SIZE_1M);
 		return -1;
 	}
 
 	// Выделяем память для чтения из файла
 	printf("Allocating memory for reading from file...              \n");
-	uint32_t *rdBuf = (uint32_t *)virtAlloc(SIZE_1G);
+	uint32_t *rdBuf = (uint32_t *)virtAlloc(g_fsize);
 	if (!rdBuf)
 	{
-		//printf("error: can not alloc %d Mbytes\n", SIZE_32M / SIZE_1M);
-		printf("ERROR: can not alloc %d Mbytes for reading from file\n", SIZE_1G / SIZE_1M);
+		printf("ERROR: can not alloc %d Mbytes for reading from file\n", g_fsize / SIZE_1M);
 		return -1;
 	}
 
@@ -194,8 +195,8 @@ int main(int argc, char *argv[])
 	double quad_time[4] = { 0., 0., 0., 0.};
 	int idxq = 0;
 
-	size_t writesize = SIZE_1G;
-	const int bsize = SIZE_1G / sizeof(int32_t);
+	size_t writesize = g_fsize;
+	const int bsize = g_fsize / sizeof(int32_t);
 
 	if (g_drive)
 	{
@@ -210,6 +211,12 @@ int main(int argc, char *argv[])
 	}
 
 	int count = 0;
+	int count1500 = 0;
+	int count1600 = 0;
+	int count1700 = 0;
+	int count1800 = 0;
+	int count1900 = 0;
+	int count2000 = 0;
 	int cycle = 0;
 	while (!exit_app)
 	{
@@ -219,7 +226,7 @@ int main(int argc, char *argv[])
 				wrBuf[i] = (idx << 16) + i;
 
 			int ret = 0;
-			sprintf(wrfname, "%s_%04d", file_name, idx);
+			sprintf(wrfname, "%s_%07d", file_name, idx);
 
 			ipc_time_t start_time, stop_time;
 			start_time = ipc_get_time();
@@ -252,9 +259,25 @@ int main(int argc, char *argv[])
 				double speed_cur = ((double)writesize / wr_time) / 1000.;
 				double speed_min = ((double)writesize / max_time) / 1000.;
 
-				printf("WRITE Speed (%d %s): Avr %.4f Mb/s (%.4f), Cur %.4f Mb/s, Min %.4f Mb/s\r", cycle, wrfname, speed_avr, quad_avr, speed_cur, speed_min);
+				if (speed_cur < 1500.) count1500++;
+				else if (speed_cur < 1600.) count1600++;
+					else if (speed_cur < 1700.) count1700++;
+						else if (speed_cur < 1800.) count1800++;
+							else if (speed_cur < 1900.) count1900++;
+								else if (speed_cur < 2000.) count2000++;
+
+				printf("WRITE Speed (%d %s): Avr %.4f Mb/s (%.4f), Cur %.4f Mb/s, Min %.4f Mb/s (%d %d %d %d %d %d)\r", 
+					cycle, wrfname, speed_avr, quad_avr, speed_cur, speed_min, 
+					count2000, count1900, count1800, count1700, count1600, count1500);
 				if (speed_cur < g_speed_limit)
+				{
 					printf("\n");
+					char message[256];
+					sprintf(message, "WRITE Speed (%d %s): Avr %.4f Mb/s (%.4f), Cur %.4f Mb/s, Min %.4f Mb/s (%d %d %d %d %d %d)",
+						cycle, wrfname, speed_avr, quad_avr, speed_cur, speed_min,
+						count2000, count1900, count1800, count1700, count1600, count1500);
+					_LOG << log4cpp::Priority::INFO << message;
+				}
 
 			}
 			if (exit_app)
@@ -269,12 +292,12 @@ int main(int argc, char *argv[])
 		max_time = 0.;
 
 		char rdfname[512];
-		size_t readsize = SIZE_1G;
+		size_t readsize = g_fsize;
 
 		for (int idx = 0; idx < g_fcnt; idx++)
 		{
 			int ret = 0;
-			sprintf(rdfname, "%s_%03d", file_name, idx);
+			sprintf(rdfname, "%s_%07d", file_name, idx);
 
 			ipc_time_t start_time, stop_time;
 			start_time = ipc_get_time();

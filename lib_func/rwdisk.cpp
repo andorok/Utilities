@@ -20,11 +20,18 @@
 int file_write_direct(char* fname, void *buf, size_t size)
 {
 #ifdef __linux__
+	// driveworker.cpp
+//	auto openFlags = O_WRONLY | O_CREAT | /*O_TRUNC |*/ O_DIRECT; // | O_SYNC;
+//	int fd = ::open64(name.c_str(), openFlags, 0644);
+//	::ftruncate64(fd, targetFileSize); // обрезать файл до указанной длины
+//	// ::posix_fadvise(fd, 0, targetFileSize, POSIX_FADV_RANDOM); // Отключить предвыборку на запись
+//	::posix_fallocate64(fd, 0, targetFileSize); // выделить на диске место для файла (последующие записи гарантированно не завершатся ошибкой из-за нехватки места)
+
 	int sysflag = O_CREAT | O_TRUNC | O_WRONLY | O_DIRECT | O_SYNC;
 	int hfile = open(fname, sysflag, 0666);
 	if (hfile < 0)
 	{
-		printf("ERROR: can not open %s\n", fname);
+		printf("ERROR: can not open %s\n", fname, , strerror(errno));
 		return -1;
 	}
 	printf("Writing file %s ...                   \r", fname);
@@ -36,6 +43,16 @@ int file_write_direct(char* fname, void *buf, size_t size)
 		return -2;
 	}
 	close(hfile);
+
+	// driveworker.cpp
+//	ssize_t writeResult = ::pwrite64(fd, writeCount + (char *)data, bytes - writeCount, offset + writeCount);
+
+
+	// fsync сбрасывает все буферы/кэшы файла на диск, чтобы никакая измененная информация не могла быть потеряна
+	// даже в случае краха или перезагрузки системы
+//	::fsync(hddFd); // синхронизировать внутреннее состояние файла с устройством хранения
+//	::close(hddFd);
+
 #else
 	unsigned long amode = GENERIC_WRITE;
 	unsigned long cmode = CREATE_ALWAYS;
