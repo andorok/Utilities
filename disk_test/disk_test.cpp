@@ -76,7 +76,8 @@ int g_fcnt = 1;
 int g_direct = 0;
 int g_drive = 0;
 int g_read = 0;
-double g_speed_limit = 1800.;
+//double g_speed_limit = 1800.;
+double g_speed_limit = 450.;
 int g_fsize = 1024;
 
 static bool exit_app = false;
@@ -220,6 +221,7 @@ int main(int argc, char *argv[])
 	int cycle = 0;
 	while (!exit_app)
 	{
+		printf("\n");
 		for (int idx = 0; idx < g_fcnt; idx++)
 		{
 			for (int i = 0; i < bsize; i++)
@@ -259,12 +261,20 @@ int main(int argc, char *argv[])
 				double speed_cur = ((double)writesize / wr_time) / 1000.;
 				double speed_min = ((double)writesize / max_time) / 1000.;
 
-				if (speed_cur < 1500.) count1500++;
-				else if (speed_cur < 1600.) count1600++;
-					else if (speed_cur < 1700.) count1700++;
-						else if (speed_cur < 1800.) count1800++;
-							else if (speed_cur < 1900.) count1900++;
-								else if (speed_cur < 2000.) count2000++;
+				// for Samsung PM9A3
+				//if (speed_cur < 1500.) count1500++;
+				//else if (speed_cur < 1600.) count1600++;
+				//	else if (speed_cur < 1700.) count1700++;
+				//		else if (speed_cur < 1800.) count1800++;
+				//			else if (speed_cur < 1900.) count1900++;
+				//				else if (speed_cur < 2000.) count2000++;
+				// for Samsung 860 Pro 
+				if (speed_cur < 250.) count1500++;
+				else if (speed_cur < 300.) count1600++;
+					else if (speed_cur < 350.) count1700++;
+						else if (speed_cur < 400.) count1800++;
+							else if (speed_cur < 450.) count1900++;
+								else if (speed_cur < 500.) count2000++;
 
 				printf("WRITE Speed (%d %s): Avr %.4f Mb/s (%.4f), Cur %.4f Mb/s, Min %.4f Mb/s (%d %d %d %d %d %d)\r", 
 					cycle, wrfname, speed_avr, quad_avr, speed_cur, speed_min, 

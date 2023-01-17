@@ -13,6 +13,7 @@
 //#include <errno.h>
 #include <linux/hdreg.h>
 #include <linux/fs.h>
+#include <string.h>
 #endif
 
 #include "time_func.h"
@@ -31,7 +32,7 @@ int file_write_direct(char* fname, void *buf, size_t size)
 	int hfile = open(fname, sysflag, 0666);
 	if (hfile < 0)
 	{
-		printf("ERROR: can not open %s\n", fname, , strerror(errno));
+		printf("ERROR: can not open file %s: %s\n", fname, strerror(errno));
 		return -1;
 	}
 	printf("Writing file %s ...                   \r", fname);
@@ -243,6 +244,12 @@ ULONG GetSerial(HANDLE hFile)
 						{
 							dwError = ERROR_NO_DATA;
 						}
+						if (psdd->BusType == BusTypeUsb)
+							printf("Bus type: USB \n");
+						if(psdd->BusType == BusTypeSata)
+							printf("Bus type: SATA \n");
+						if (psdd->BusType == BusTypeNvme)
+							printf("Bus type: NVME \n");
 					}
 				}
 				else

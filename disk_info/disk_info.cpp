@@ -19,7 +19,7 @@
 //#include "../lib_func/cpu_func.h"
 #include "../lib_func/cmdline.h"
 
-//#include <cstring>
+//#include <string>
 //#include <tuple>
 
 #ifdef __linux__
@@ -131,18 +131,38 @@ int main(int argc, char *argv[])
 	ParseCommandLine(argc, argv);
 
 	int ret = 0;
+#ifdef __linux__
+    char sd_name[128] = "/dev/sd";
+    char nvme_name[128] = "/dev/nvme";
+#else
 	char strname[MAX_PATH] = "\\\\.\\PhysicalDrive";
+#endif // __linux__
 	int phys_num = 0;
 	char drive_name[MAX_PATH];
 	do
 	{
 		printf("\n");
+#ifdef __linux__
+		sprintf(drive_name, "%s%c", sd_name, (char)('a'+phys_num));
+#else
 		sprintf(drive_name, "%s%d", strname, phys_num);
+#endif // __linux__
 		ret = get_info_drive(drive_name);
 		phys_num++;
 	} while (ret >= 0);
 
-#ifdef _WIN32
+#ifdef __linux__
+	phys_num = 0;
+	do
+	{
+		printf("\n");
+        sprintf(drive_name, "%s%d%s", nvme_name, phys_num, "n1");
+		ret = get_info_drive(drive_name);
+		phys_num++;
+	} while (ret >= 0);
+#endif // __linux__
+
+    #ifdef _WIN32
 	//if (g_key)
 	{
 		printf("Press any key to quit of program\n");
