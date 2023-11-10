@@ -52,11 +52,11 @@ char file_name[MAX_PATH] = "../data";
 //char file_name[MAX_PATH] = "/mnt/diskG/data";
 //char file_name[MAX_PATH] = "/mnt/f/32G/data";
 #else
-//char drive_name[MAX_PATH] = "\\\\.\\C:";
-//char file_name[MAX_PATH] = "C:/_WORKS/data";
+char drive_name[MAX_PATH] = "\\\\.\\C:";
+char file_name[MAX_PATH] = "C:/_WORKS/data";
 //char drive_name[MAX_PATH] = "\\\\.\\G:";
-char drive_name[MAX_PATH] = "\\\\.\\H:";
-char file_name[MAX_PATH] = "H:/data";
+//char drive_name[MAX_PATH] = "\\\\.\\H:";
+//char file_name[MAX_PATH] = "H:/data";
 //char file_name[MAX_PATH] = "F:/32G/data";
 #endif // __linux__
 
@@ -76,8 +76,9 @@ int g_fcnt = 1;
 int g_direct = 0;
 int g_drive = 0;
 int g_read = 0;
+double g_speed_limit = 3600.;
 //double g_speed_limit = 1800.;
-double g_speed_limit = 450.;
+//double g_speed_limit = 450.;
 int g_fsize = 1024;
 
 static bool exit_app = false;
@@ -155,6 +156,13 @@ int main(int argc, char *argv[])
 	// создаем отсылатель сообщений в файл (с поддержкой ротации по размеру)
 	std::string log_file = "disk_test.log";
 	log4cpp::Appender *appender2 = new log4cpp::RollingFileAppender("default", log_file, 16 * 1024 * 1024, 8);
+
+	// настраиваем формат вывода сообщения
+	log4cpp::PatternLayout *playout = new log4cpp::PatternLayout();
+	// [%p] - INFO
+	//playout->setConversionPattern("%d{%Y-%m-%d %H:%M:%S.%l} [%p] [%c] %m\n");
+	playout->setConversionPattern("%d{%Y-%m-%d %H:%M:%S.%l} %m\n");
+	appender2->setLayout(playout); // задаем формат вывода
 
 	// настраиваем уровень логгирования
 	log4cpp::Category& _LOG = log4cpp::Category::getRoot();
@@ -261,6 +269,13 @@ int main(int argc, char *argv[])
 				double speed_cur = ((double)writesize / wr_time) / 1000.;
 				double speed_min = ((double)writesize / max_time) / 1000.;
 
+				// for RAID0 of 2 Samsung PM9A3
+				if (speed_cur < 3400.) count1500++;
+				else if (speed_cur < 3500.) count1600++;
+				else if (speed_cur < 3600.) count1700++;
+				else if (speed_cur < 3700.) count1800++;
+				else if (speed_cur < 3800.) count1900++;
+				else if (speed_cur < 3900.) count2000++;
 				// for Samsung PM9A3
 				//if (speed_cur < 1500.) count1500++;
 				//else if (speed_cur < 1600.) count1600++;
@@ -269,12 +284,12 @@ int main(int argc, char *argv[])
 				//			else if (speed_cur < 1900.) count1900++;
 				//				else if (speed_cur < 2000.) count2000++;
 				// for Samsung 860 Pro 
-				if (speed_cur < 250.) count1500++;
-				else if (speed_cur < 300.) count1600++;
-					else if (speed_cur < 350.) count1700++;
-						else if (speed_cur < 400.) count1800++;
-							else if (speed_cur < 450.) count1900++;
-								else if (speed_cur < 500.) count2000++;
+				//if (speed_cur < 250.) count1500++;
+				//else if (speed_cur < 300.) count1600++;
+				//	else if (speed_cur < 350.) count1700++;
+				//		else if (speed_cur < 400.) count1800++;
+				//			else if (speed_cur < 450.) count1900++;
+				//				else if (speed_cur < 500.) count2000++;
 
 				printf("WRITE Speed (%d %s): Avr %.4f Mb/s (%.4f), Cur %.4f Mb/s, Min %.4f Mb/s (%d %d %d %d %d %d)\r", 
 					cycle, wrfname, speed_avr, quad_avr, speed_cur, speed_min, 
