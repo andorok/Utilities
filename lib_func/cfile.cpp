@@ -175,7 +175,7 @@ int CFile::seek(size_t pos, int method)
 		return -1;
 	}
 #else
-	// match (совпадают)
+	// match (СЃРѕРІРїР°РґР°СЋС‚)
 	//if (method == SEEK_SET)
 	//	method = FILE_BEGIN;
 	//else
