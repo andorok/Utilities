@@ -14,6 +14,7 @@
 #include <sys/ioctl.h>
 //#include <errno.h>
 //#include <linux/hdreg.h>
+#include<linux/nvme_ioctl.h>
 #endif
 
 //#include "../lib_func/cpu_func.h"
@@ -123,6 +124,7 @@ void ParseCommandLine(int argc, char *argv[])
 }
 
 int get_info_drive(char* drvname);
+int nvme_info(char* drvname);
 
 int main(int argc, char *argv[])
 {
@@ -134,6 +136,7 @@ int main(int argc, char *argv[])
 #ifdef __linux__
     char sd_name[128] = "/dev/sd";
     char nvme_name[128] = "/dev/nvme";
+	char sd_raid[128] = "/dev/md127";
 #else
 	char strname[MAX_PATH] = "\\\\.\\PhysicalDrive";
 #endif // __linux__
@@ -152,14 +155,24 @@ int main(int argc, char *argv[])
 	} while (ret >= 0);
 
 #ifdef __linux__
+	//phys_num = 0;
+	//do
+	//{
+	//	printf("\n");
+ //       sprintf(drive_name, "%s%d%s", nvme_name, phys_num, "n1");
+	//	ret = get_info_drive(drive_name);
+	//	phys_num++;
+	//} while (ret >= 0);
+	//ret = get_info_drive(sd_raid);
 	phys_num = 0;
 	do
 	{
 		printf("\n");
-        sprintf(drive_name, "%s%d%s", nvme_name, phys_num, "n1");
-		ret = get_info_drive(drive_name);
+		sprintf(drive_name, "%s%d%s", nvme_name, phys_num, "n1");
+		ret = nvme_info(drive_name);
 		phys_num++;
 	} while (ret >= 0);
+	//ret = nvme_info(sd_raid);
 #endif // __linux__
 
     #ifdef _WIN32
